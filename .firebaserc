@@ -1,0 +1,14 @@
+{
+  "projects": {
+    "default": "brainquest-68944"
+  },
+  "targets": {
+    "brainquest-68944": {
+      "hosting": {
+        "brainquest": [
+          "brainquest"
+        ]
+      }
+    }
+  }
+}
