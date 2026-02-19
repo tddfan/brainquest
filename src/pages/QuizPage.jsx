@@ -220,6 +220,15 @@ export default function QuizPage() {
                   />
                 </div>
               )}
+              {q.imageUrl && (
+                <div className="flex justify-center mb-4">
+                  <img
+                    src={q.imageUrl}
+                    alt="Landmark"
+                    className="w-full max-h-52 rounded-xl shadow-lg object-cover border border-white/10"
+                  />
+                </div>
+              )}
               <p className="text-lg md:text-xl font-extrabold text-center leading-snug">
                 {q.question}
               </p>
