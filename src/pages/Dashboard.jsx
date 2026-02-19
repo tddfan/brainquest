@@ -1,8 +1,9 @@
-import { motion } from 'framer-motion'
+import { useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { CATEGORIES, AVATARS, calcLevel, xpToNextLevel } from '../data/questions'
-import { Trophy, LogOut, Star } from 'lucide-react'
+import { Trophy, LogOut, Star, Info, X } from 'lucide-react'
 
 const cardVariants = {
   hidden: { opacity: 0, y: 40 },
@@ -16,6 +17,7 @@ const cardVariants = {
 export default function Dashboard() {
   const { userProfile, logout } = useAuth()
   const navigate = useNavigate()
+  const [showAbout, setShowAbout] = useState(false)
 
   const xp = userProfile?.totalXP ?? 0
   const level = calcLevel(xp)
@@ -135,7 +137,76 @@ export default function Dashboard() {
             </div>
           ))}
         </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-center mt-10 pb-2">
+          <button
+            onClick={() => setShowAbout(true)}
+            className="flex items-center gap-2 text-gray-500 hover:text-gray-300 transition-colors text-xs font-semibold group"
+          >
+            <Info size={14} className="group-hover:text-violet-400 transition-colors" />
+            About BrainQuest
+          </button>
+        </div>
       </div>
+
+      {/* About modal */}
+      <AnimatePresence>
+        {showAbout && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowAbout(false)}
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
+            />
+
+            {/* Modal */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.85, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.85, y: 20 }}
+              transition={{ type: 'spring', bounce: 0.3 }}
+              className="fixed inset-0 flex items-center justify-center z-50 px-4"
+            >
+              <div className="glass card max-w-sm w-full text-center py-8 relative">
+                <button
+                  onClick={() => setShowAbout(false)}
+                  className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors"
+                >
+                  <X size={18} />
+                </button>
+
+                <div className="text-5xl mb-4">🧠</div>
+                <h2 className="text-2xl font-black mb-1">BrainQuest</h2>
+                <p className="text-gray-400 text-sm mb-6">
+                  A gamified learning platform for curious minds
+                </p>
+
+                <div className="glass rounded-2xl py-4 px-5 mb-4">
+                  <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Created by</p>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-center gap-2">
+                      <span className="text-xl">👨‍💻</span>
+                      <span className="font-extrabold text-white">Aarav Sharma</span>
+                    </div>
+                    <div className="flex items-center justify-center gap-2">
+                      <span className="text-xl">👨‍💼</span>
+                      <span className="font-extrabold text-white">Sanjay Sharma</span>
+                    </div>
+                  </div>
+                </div>
+
+                <p className="text-gray-500 text-xs">
+                  © {new Date().getFullYear()} BrainQuest · All rights reserved
+                </p>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
