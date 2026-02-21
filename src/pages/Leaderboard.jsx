@@ -7,7 +7,19 @@ import { useAuth } from '../contexts/AuthContext'
 import { AVATARS, calcLevel } from '../data/questions'
 import { ArrowLeft, Trophy, Crown, Star } from 'lucide-react'
 
-const MEDALS = ['🥇', '🥈', '🥉']
+const TIERS = [
+  { name: 'Sage', minXP: 100000, color: 'text-rose-400', bg: 'bg-rose-400/10', border: 'border-rose-400/30' },
+  { name: 'Legend', minXP: 50000, color: 'text-amber-400', bg: 'bg-amber-400/10', border: 'border-amber-400/30' },
+  { name: 'Master', minXP: 20000, color: 'text-violet-400', bg: 'bg-violet-400/10', border: 'border-violet-400/30' },
+  { name: 'Scholar', minXP: 5000, color: 'text-blue-400', bg: 'bg-blue-400/10', border: 'border-blue-400/30' },
+  { name: 'Novice', minXP: 0, color: 'text-gray-400', bg: 'bg-gray-400/10', border: 'border-gray-400/30' },
+];
+
+const MEDALS = ['🥇', '🥈', '🥉'];
+
+function getTier(xp) {
+  return TIERS.find(t => xp >= t.minXP) || TIERS[TIERS.length - 1];
+}
 
 export default function Leaderboard() {
   const [entries, setEntries] = useState([])
@@ -156,10 +168,15 @@ export default function Leaderboard() {
                     {/* Avatar + name */}
                     <span className="text-2xl">{AVATARS[e.avatarIndex ?? 0]}</span>
                     <div className="flex-1 min-w-0">
-                      <p className="font-black truncate">
-                        {e.username}
-                        {isMe && <span className="text-violet-400 text-sm font-normal ml-1">(you)</span>}
-                      </p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-black truncate">
+                          {e.username}
+                        </p>
+                        {isMe && <span className="text-violet-400 text-sm font-normal">(you)</span>}
+                        <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${getTier(e.totalXP).color} ${getTier(e.totalXP).bg} ${getTier(e.totalXP).border} uppercase tracking-wider`}>
+                          {getTier(e.totalXP).name}
+                        </span>
+                      </div>
                       <div className="flex items-center gap-2 text-xs text-gray-400">
                         <Star size={10} fill="currentColor" className="text-yellow-400" />
                         Level {calcLevel(e.totalXP)}

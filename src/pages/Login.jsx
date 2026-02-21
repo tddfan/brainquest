@@ -2,10 +2,10 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useAuth } from '../contexts/AuthContext'
-import { Mail, Lock, AlertCircle } from 'lucide-react'
+import { User, Lock, AlertCircle } from 'lucide-react'
 
 export default function Login() {
-  const [email, setEmail] = useState('')
+  const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -17,10 +17,12 @@ export default function Login() {
     setError('')
     setLoading(true)
     try {
-      await login(email, password)
+      await login(identifier, password)
       navigate('/')
     } catch (err) {
-      setError('Invalid email or password. Please try again.')
+      setError(err.message === 'No account found with that username'
+        ? 'No account found with that username.'
+        : 'Invalid credentials. Please try again.')
     }
     setLoading(false)
   }
@@ -49,15 +51,15 @@ export default function Login() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="text-sm font-bold text-gray-400 mb-1.5 block">Email</label>
+            <label className="text-sm font-bold text-gray-400 mb-1.5 block">Email or Username</label>
             <div className="relative">
-              <Mail size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+              <User size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
-                type="email"
+                type="text"
                 required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
+                value={identifier}
+                onChange={(e) => setIdentifier(e.target.value)}
+                placeholder="you@example.com or username"
                 className="w-full bg-white/5 border border-white/10 rounded-2xl pl-10 pr-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-violet-500 transition-colors"
               />
             </div>

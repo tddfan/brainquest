@@ -7,6 +7,14 @@ import Register from './pages/Register'
 import QuizPage from './pages/QuizPage'
 import Leaderboard from './pages/Leaderboard'
 import Profile from './pages/Profile'
+import SudokuPage from './pages/SudokuPage'
+import CrosswordPage from './pages/CrosswordPage'
+import WordlePage from './pages/WordlePage'
+import HangmanPage from './pages/HangmanPage'
+import ChessPage from './pages/ChessPage'
+import Millionaire from './pages/Millionaire'
+import DailyFun from './pages/DailyFun'
+import Shop from './pages/Shop'
 
 export default function App() {
   return (
@@ -47,6 +55,72 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <Profile />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/puzzle/sudoku"
+            element={
+              <ProtectedRoute>
+                <SudokuPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/puzzle/crossword"
+            element={
+              <ProtectedRoute>
+                <CrosswordPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/puzzle/wordle"
+            element={
+              <ProtectedRoute>
+                <WordlePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/puzzle/hangman"
+            element={
+              <ProtectedRoute>
+                <HangmanPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/puzzle/chess"
+            element={
+              <ProtectedRoute>
+                <ChessPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/puzzle/millionaire"
+            element={
+              <ProtectedRoute>
+                <Millionaire />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/daily-fun"
+            element={
+              <ProtectedRoute>
+                <DailyFun />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/shop"
+            element={
+              <ProtectedRoute>
+                <Shop />
               </ProtectedRoute>
             }
           />

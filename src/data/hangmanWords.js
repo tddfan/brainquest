@@ -1,0 +1,98 @@
+// ─── HANGMAN WORD BANK ────────────────────────────────────────────────────────
+// 80 entries across 5 categories. word is UPPERCASE.
+export const HANGMAN_WORDS = [
+  // ── Animals ──────────────────────────────────────────────────────────────
+  { word: 'ELEPHANT', category: 'Animals', hint: 'Largest land animal with a trunk' },
+  { word: 'PENGUIN', category: 'Animals', hint: 'Flightless bird that loves cold climates' },
+  { word: 'DOLPHIN', category: 'Animals', hint: 'Highly intelligent ocean mammal' },
+  { word: 'CHEETAH', category: 'Animals', hint: 'Fastest land animal on Earth' },
+  { word: 'GORILLA', category: 'Animals', hint: 'Largest living primate' },
+  { word: 'FLAMINGO', category: 'Animals', hint: 'Pink bird that stands on one leg' },
+  { word: 'CHAMELEON', category: 'Animals', hint: 'Reptile that can change colour' },
+  { word: 'PLATYPUS', category: 'Animals', hint: 'Egg-laying mammal with a duck bill' },
+  { word: 'OCTOPUS', category: 'Animals', hint: 'Eight-armed sea creature' },
+  { word: 'KANGAROO', category: 'Animals', hint: 'Australian marsupial with a pouch' },
+  { word: 'GIRAFFE', category: 'Animals', hint: 'Tallest animal on Earth' },
+  { word: 'CHIMPANZEE', category: 'Animals', hint: 'Our closest living relative' },
+  { word: 'JAGUAR', category: 'Animals', hint: 'Spotted big cat of the Americas' },
+  { word: 'NARWHAL', category: 'Animals', hint: 'Arctic whale with a long spiral tusk' },
+  { word: 'MANTIS', category: 'Animals', hint: 'Praying insect known for still hunting' },
+  { word: 'PIRANHA', category: 'Animals', hint: 'Ferocious freshwater fish with sharp teeth' },
+
+  // ── Technology ────────────────────────────────────────────────────────────
+  { word: 'PYTHON', category: 'Technology', hint: 'Popular programming language, not a snake' },
+  { word: 'ALGORITHM', category: 'Technology', hint: 'Step-by-step problem-solving instructions' },
+  { word: 'BROWSER', category: 'Technology', hint: 'Software used to surf the web' },
+  { word: 'ETHERNET', category: 'Technology', hint: 'Wired local area network standard' },
+  { word: 'FIREWALL', category: 'Technology', hint: 'Security system that blocks threats' },
+  { word: 'KEYBOARD', category: 'Technology', hint: 'Input device with letters and numbers' },
+  { word: 'SATELLITE', category: 'Technology', hint: 'Object orbiting Earth for GPS or TV' },
+  { word: 'PROCESSOR', category: 'Technology', hint: 'Brain of a computer (CPU)' },
+  { word: 'ROUTER', category: 'Technology', hint: 'Device that directs network traffic' },
+  { word: 'BLUETOOTH', category: 'Technology', hint: 'Wireless short-range connection standard' },
+  { word: 'DOWNLOAD', category: 'Technology', hint: 'Transferring data from a server to your device' },
+  { word: 'QUANTUM', category: 'Technology', hint: 'Type of ultra-fast future computing' },
+  { word: 'DATABASE', category: 'Technology', hint: 'Organised collection of digital records' },
+  { word: 'MALWARE', category: 'Technology', hint: 'Malicious software designed to harm' },
+  { word: 'AVATAR', category: 'Technology', hint: 'Digital representation of a user online' },
+  { word: 'PIXEL', category: 'Technology', hint: 'Smallest unit of a digital image' },
+
+  // ── Movies ────────────────────────────────────────────────────────────────
+  { word: 'INCEPTION', category: 'Movies', hint: 'Christopher Nolan dream-within-a-dream thriller' },
+  { word: 'TITANIC', category: 'Movies', hint: 'James Cameron epic romance on a doomed ship' },
+  { word: 'AVATAR', category: 'Movies', hint: 'Highest-grossing film set on the planet Pandora' },
+  { word: 'FROZEN', category: 'Movies', hint: 'Disney film featuring the song "Let It Go"' },
+  { word: 'GLADIATOR', category: 'Movies', hint: 'Russell Crowe fights in the Roman Colosseum' },
+  { word: 'INTERSTELLAR', category: 'Movies', hint: 'Space-time travel through a wormhole' },
+  { word: 'PARASITE', category: 'Movies', hint: 'Oscar-winning Korean thriller about class' },
+  { word: 'JAWS', category: 'Movies', hint: 'Spielberg\'s great white shark summer blockbuster' },
+  { word: 'MATRIX', category: 'Movies', hint: 'Red pill or blue pill — choose your reality' },
+  { word: 'COCO', category: 'Movies', hint: 'Pixar film about the Mexican Day of the Dead' },
+  { word: 'ALIEN', category: 'Movies', hint: 'Ridley Scott sci-fi horror "In space no one can hear you scream"' },
+  { word: 'ROCKY', category: 'Movies', hint: 'Underdog boxer training to the sounds of "Eye of the Tiger"' },
+  { word: 'GRAVITY', category: 'Movies', hint: 'Sandra Bullock stranded in orbit around Earth' },
+  { word: 'SHREK', category: 'Movies', hint: 'Green ogre from a fairy-tale swamp' },
+  { word: 'JOKER', category: 'Movies', hint: 'Joaquin Phoenix as the iconic Batman villain' },
+  { word: 'DUNKIRK', category: 'Movies', hint: 'Nolan\'s WWII evacuation with no traditional narrative' },
+
+  // ── Countries ─────────────────────────────────────────────────────────────
+  { word: 'BRAZIL', category: 'Countries', hint: 'South American country famous for Carnival' },
+  { word: 'ICELAND', category: 'Countries', hint: 'Nordic island nation of fire and ice' },
+  { word: 'ETHIOPIA', category: 'Countries', hint: 'East African nation, cradle of humanity' },
+  { word: 'PORTUGAL', category: 'Countries', hint: 'European country famous for pastéis de nata' },
+  { word: 'VIETNAM', category: 'Countries', hint: 'Southeast Asian country shaped like an "S"' },
+  { word: 'MOROCCO', category: 'Countries', hint: 'North African kingdom with vast desert' },
+  { word: 'ARGENTINA', category: 'Countries', hint: 'Home of Messi and the tango' },
+  { word: 'SWEDEN', category: 'Countries', hint: 'Scandinavian country known for IKEA and ABBA' },
+  { word: 'INDONESIA', category: 'Countries', hint: 'Archipelago nation with over 17,000 islands' },
+  { word: 'UKRAINE', category: 'Countries', hint: 'Largest country entirely within Europe' },
+  { word: 'COLOMBIA', category: 'Countries', hint: 'South American country known for coffee' },
+  { word: 'NIGERIA', category: 'Countries', hint: 'Most populous country in Africa' },
+  { word: 'NEPAL', category: 'Countries', hint: 'Home to Mount Everest, the world\'s highest peak' },
+  { word: 'DENMARK', category: 'Countries', hint: 'Scandinavian country and home of LEGO' },
+  { word: 'ECUADOR', category: 'Countries', hint: 'Country that sits exactly on the equator' },
+  { word: 'HUNGARY', category: 'Countries', hint: 'Central European country with Budapest as capital' },
+
+  // ── Food ──────────────────────────────────────────────────────────────────
+  { word: 'SPAGHETTI', category: 'Food', hint: 'Long thin pasta served with sauce' },
+  { word: 'AVOCADO', category: 'Food', hint: 'Green fruit used to make guacamole' },
+  { word: 'PANCAKE', category: 'Food', hint: 'Flat batter cake topped with syrup or fruit' },
+  { word: 'BURRITO', category: 'Food', hint: 'Mexican wrap filled with rice, beans and meat' },
+  { word: 'CROISSANT', category: 'Food', hint: 'Flaky crescent-shaped French pastry' },
+  { word: 'WAFFLE', category: 'Food', hint: 'Grid-patterned batter cake, popular for brunch' },
+  { word: 'HUMMUS', category: 'Food', hint: 'Middle Eastern chickpea dip' },
+  { word: 'PRETZEL', category: 'Food', hint: 'Twisted baked bread snack, often salted' },
+  { word: 'TEMPURA', category: 'Food', hint: 'Japanese light batter-fried seafood or veg' },
+  { word: 'QUINOA', category: 'Food', hint: 'Ancient South American high-protein grain' },
+  { word: 'TIRAMISU', category: 'Food', hint: 'Italian coffee-flavoured layered dessert' },
+  { word: 'PAELLA', category: 'Food', hint: 'Spanish saffron rice dish from Valencia' },
+  { word: 'MANGO', category: 'Food', hint: 'Tropical stone fruit, the most eaten in the world' },
+  { word: 'FALAFEL', category: 'Food', hint: 'Middle Eastern fried chickpea balls in pitta' },
+  { word: 'KIMCHI', category: 'Food', hint: 'Korean fermented spicy cabbage dish' },
+  { word: 'CHURRO', category: 'Food', hint: 'Spanish fried dough stick dusted in sugar' },
+]
+
+export function getRandomHangmanWord(excludeWord = null) {
+  const pool = excludeWord ? HANGMAN_WORDS.filter((w) => w.word !== excludeWord) : HANGMAN_WORDS
+  return pool[Math.floor(Math.random() * pool.length)]
+}

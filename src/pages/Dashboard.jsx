@@ -1,9 +1,104 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { CATEGORIES, AVATARS, calcLevel, xpToNextLevel } from '../data/questions'
-import { Trophy, LogOut, Star, Info, X } from 'lucide-react'
+import { Trophy, LogOut, Star, Info, X, Zap, Gift, Target, Award, ShoppingBag } from 'lucide-react'
+import confetti from 'canvas-confetti'
+import { doc, updateDoc, increment } from 'firebase/firestore'
+import { db } from '../firebase/config'
+import { useSound } from '../hooks/useSound'
+
+const SECTIONS = [
+  { id: 'quizzes', label: 'Quizzes', emoji: '🎯' },
+  { id: 'puzzles', label: 'Puzzles', emoji: '🧩' },
+  { id: 'fun', label: 'Daily Fun', emoji: '✨' },
+]
+
+const PUZZLE_TILES = [
+  {
+    id: 'millionaire',
+    label: 'XP Millionaire',
+    emoji: '💰',
+    description: '15 questions to reach 1 Million XP',
+    gradient: 'from-blue-700 to-indigo-600',
+    xpNote: 'Up to 10,000 XP',
+    path: '/puzzle/millionaire',
+    isNew: true,
+  },
+  {
+    id: 'chess',
+    label: 'Chess',
+    emoji: '♟️',
+    description: 'Beat the computer at chess',
+    gradient: 'from-neutral-700 to-gray-600',
+    xpNote: 'Up to 800 XP',
+    path: '/puzzle/chess',
+  },
+  {
+    id: 'sudoku',
+    label: 'Sudoku',
+    emoji: '🔢',
+    description: 'Fill every row, column & box with 1–9',
+    gradient: 'from-emerald-600 to-teal-500',
+    xpNote: 'Up to 950 XP',
+    path: '/puzzle/sudoku',
+  },
+  {
+    id: 'crossword',
+    label: 'Mini Crossword',
+    emoji: '📝',
+    description: 'Solve a 7×7 crossword puzzle',
+    gradient: 'from-rose-600 to-pink-500',
+    xpNote: 'Up to 350 XP',
+    path: '/puzzle/crossword',
+  },
+  {
+    id: 'wordle',
+    label: 'Wordle',
+    emoji: '🟩',
+    description: 'Guess the 5-letter word in 6 tries',
+    gradient: 'from-green-600 to-lime-500',
+    xpNote: 'Up to 300 XP',
+    path: '/puzzle/wordle',
+  },
+  {
+    id: 'hangman',
+    label: 'Hangman',
+    emoji: '🪢',
+    description: 'Guess letters before the man falls',
+    gradient: 'from-orange-600 to-amber-500',
+    xpNote: 'Up to 200 XP',
+    path: '/puzzle/hangman',
+  },
+]
+
+const DAILY_TILES = [
+  {
+    id: 'jokes',
+    label: 'Daily Jokes',
+    emoji: '😂',
+    description: 'A fresh laugh every day',
+    gradient: 'from-pink-600 to-rose-500',
+    path: '/daily-fun',
+  },
+  {
+    id: 'riddles',
+    label: 'Riddles',
+    emoji: '🧩',
+    description: 'Test your lateral thinking',
+    gradient: 'from-violet-600 to-indigo-500',
+    path: '/daily-fun',
+  },
+  {
+    id: 'paradoxes',
+    label: 'Paradoxes',
+    emoji: '🌀',
+    description: 'Mind-bending logic puzzles',
+    gradient: 'from-cyan-600 to-blue-500',
+    path: '/daily-fun',
+  },
+]
 
 const cardVariants = {
   hidden: { opacity: 0, y: 40 },
@@ -15,14 +110,104 @@ const cardVariants = {
 }
 
 export default function Dashboard() {
-  const { userProfile, logout } = useAuth()
+  const { currentUser, userProfile, setUserProfile, logout } = useAuth()
   const navigate = useNavigate()
+  const { playSound } = useSound()
   const [showAbout, setShowAbout] = useState(false)
+  const [section, setSection] = useState('quizzes')
+  const [showDailyBonus, setShowDailyBonus] = useState(false)
 
   const xp = userProfile?.totalXP ?? 0
   const level = calcLevel(xp)
   const progress = xpToNextLevel(xp)
   const avatar = AVATARS[userProfile?.avatarIndex ?? 0]
+
+  // Daily Reward & Reset Check
+  useEffect(() => {
+    if (!currentUser || !userProfile) return
+    
+    const today = new Date().toDateString()
+    const lastDailyUpdate = userProfile.lastDailyUpdate?.toDate?.()?.toDateString() || ""
+
+    if (lastDailyUpdate !== today) {
+      // Reset count for a new day
+      const userRef = doc(db, 'users', currentUser.uid)
+      updateDoc(userRef, {
+        dailyQuizzesCount: 0,
+        lastDailyUpdate: new Date(),
+        dailyQuestClaimed: false
+      }).then(() => {
+        setUserProfile(prev => ({ 
+          ...prev, 
+          dailyQuizzesCount: 0, 
+          lastDailyUpdate: new Date(),
+          dailyQuestClaimed: false 
+        }))
+      })
+    }
+  }, [currentUser, userProfile])
+
+  // Daily Reward Logic (Existing localStorage one)
+  useEffect(() => {
+    if (!currentUser) return
+    const lastBonus = localStorage.getItem(`daily_bonus_${currentUser.uid}`)
+    const today = new Date().toDateString()
+
+    if (lastBonus !== today) {
+      setShowDailyBonus(today)
+    }
+  }, [currentUser])
+
+  const claimQuestReward = async () => {
+    if ((userProfile?.dailyQuizzesCount ?? 0) >= 3 && !userProfile?.dailyQuestClaimed) {
+      const bonus = 500
+      try {
+        const userRef = doc(db, 'users', currentUser.uid)
+        await updateDoc(userRef, {
+          totalXP: increment(bonus),
+          dailyQuestClaimed: true
+        })
+        setUserProfile(prev => ({ 
+          ...prev, 
+          totalXP: (prev?.totalXP ?? 0) + bonus,
+          dailyQuestClaimed: true 
+        }))
+        playSound('achievement')
+        confetti({ 
+          particleCount: 200, 
+          spread: 80, 
+          origin: { y: 0.6 },
+          colors: ['#f59e0b', '#fbbf24', '#ffffff']
+        })
+      } catch (e) {
+        console.error("Error claiming quest reward:", e)
+      }
+    }
+  }
+
+  const claimDailyBonus = async () => {
+    if (!showDailyBonus) return
+    const bonusXP = 250
+    try {
+      await updateDoc(doc(db, 'users', currentUser.uid), {
+        totalXP: increment(bonusXP),
+      })
+      setUserProfile((prev) => ({ ...prev, totalXP: (prev?.totalXP ?? 0) + bonusXP }))
+      localStorage.setItem(`daily_bonus_${currentUser.uid}`, showDailyBonus)
+      setShowDailyBonus(false)
+      
+      playSound('claim')
+      
+      confetti({
+        particleCount: 150,
+        spread: 70,
+        origin: { y: 0.6 },
+        colors: ['#8b5cf6', '#ec4899', '#3b82f6']
+      })
+    } catch (e) {
+      console.error('Error claiming daily bonus:', e)
+    }
+  }
 
   async function handleLogout() {
     await logout()
@@ -30,12 +215,36 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-violet-950 to-gray-950 px-4 py-8">
+    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-violet-950 to-gray-950 px-4 py-8 relative">
+      {/* Daily Bonus Modal */}
+      <AnimatePresence>
+        {showDailyBonus && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} className="fixed inset-0 bg-black/80 backdrop-blur-sm" />
+            <motion.div 
+              initial={{scale:0.5, opacity:0}} animate={{scale:1, opacity:1}} exit={{scale:0.5, opacity:0}}
+              className="glass card max-w-sm w-full p-10 text-center relative z-10 border-2 border-yellow-400/50"
+            >
+              <div className="text-7xl mb-6">🎁</div>
+              <h3 className="text-3xl font-black mb-2 text-yellow-400">Daily Gift!</h3>
+              <p className="text-gray-300 mb-8">Welcome back! Here is a little something to start your day.</p>
+              <div className="text-5xl font-black text-white mb-10">+250 <span className="text-xl text-violet-400">XP</span></div>
+              <button 
+                onClick={claimDailyBonus}
+                className="w-full bg-gradient-to-r from-yellow-400 to-orange-500 text-blue-950 font-black py-4 rounded-2xl text-lg hover:scale-105 transition-transform"
+              >
+                CLAIM REWARD
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* Header */}
       <div className="max-w-4xl mx-auto">
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-3">
-            <div className="text-4xl">{avatar}</div>
+            <div className="text-4xl cursor-pointer hover:scale-110 transition-transform" onClick={() => navigate('/profile')}>{avatar}</div>
             <div>
               <h2 className="text-xl font-extrabold leading-tight">
                 {userProfile?.username ?? 'Explorer'}
@@ -43,15 +252,22 @@ export default function Dashboard() {
               <div className="flex items-center gap-1 text-yellow-400 text-sm font-bold">
                 <Star size={14} fill="currentColor" />
                 <span>Level {level}</span>
-                <span className="text-gray-400 font-normal">· {xp} XP</span>
+                <span className="text-gray-400 font-normal">· {xp.toLocaleString()} XP</span>
               </div>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
             <button
+              onClick={() => navigate('/shop')}
+              className="flex items-center gap-2 bg-gradient-to-r from-orange-500 to-yellow-500 text-blue-950 text-sm py-2 px-4 rounded-2xl font-black shadow-lg shadow-orange-500/20 hover:scale-105 transition-transform"
+            >
+              <ShoppingBag size={16} />
+              Shop
+            </button>
+            <button
               onClick={() => navigate('/leaderboard')}
-              className="flex items-center gap-2 btn-secondary text-sm py-2 px-4"
+              className="flex items-center gap-2 btn-secondary text-sm py-2 px-4 shadow-lg shadow-black/20"
             >
               <Trophy size={16} />
               Leaderboard
@@ -66,11 +282,65 @@ export default function Dashboard() {
           </div>
         </div>
 
+        {/* Daily Quest Card */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+          <div className={`md:col-span-2 glass card p-6 border-l-4 ${userProfile?.dailyQuestClaimed ? 'border-green-500' : 'border-orange-500'} flex items-center justify-between group`}>
+            <div className="flex items-center gap-4">
+              <div className={`p-3 rounded-2xl ${userProfile?.dailyQuestClaimed ? 'bg-green-500/20 text-green-400' : 'bg-orange-500/20 text-orange-400'}`}>
+                {userProfile?.dailyQuestClaimed ? <Award size={24} /> : <Target size={24} />}
+              </div>
+              <div>
+                <p className={`text-xs font-bold uppercase tracking-widest ${userProfile?.dailyQuestClaimed ? 'text-green-500' : 'text-orange-500'}`}>
+                  {userProfile?.dailyQuestClaimed ? 'Quest Completed!' : "Today's Quest"}
+                </p>
+                <h4 className="text-lg font-black">Complete any 3 Quizzes</h4>
+                <div className="flex gap-1 mt-1">
+                  {[1,2,3].map(i => (
+                    <div key={i} className={`h-1.5 w-8 rounded-full ${i <= (userProfile?.dailyQuizzesCount ?? 0) ? (userProfile?.dailyQuestClaimed ? 'bg-green-500' : 'bg-orange-500') : 'bg-white/10'}`}></div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            
+            {userProfile?.dailyQuizzesCount >= 3 && !userProfile?.dailyQuestClaimed ? (
+              <button 
+                onClick={claimQuestReward}
+                className="bg-gradient-to-r from-orange-500 to-yellow-500 text-blue-950 font-black py-2 px-4 rounded-xl text-sm animate-pulse hover:scale-105 transition-transform"
+              >
+                CLAIM +500 XP
+              </button>
+            ) : userProfile?.dailyQuestClaimed ? (
+              <div className="text-green-400 font-bold text-sm flex items-center gap-1">
+                <Award size={16} /> Collected
+              </div>
+            ) : (
+              <div className="bg-white/5 p-2 rounded-xl text-gray-500 text-xs font-bold">
+                {userProfile?.dailyQuizzesCount ?? 0}/3
+              </div>
+            )}
+          </div>
+
+          <div className="glass card p-6 border-l-4 border-violet-500 flex items-center gap-4 cursor-pointer hover:bg-white/5 transition-colors" onClick={() => navigate('/profile')}>
+            <div className="bg-violet-500/20 p-3 rounded-2xl text-violet-400">
+              <Award size={24} />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-violet-500 uppercase tracking-widest">Collection</p>
+              <h4 className="text-lg font-black">Badges</h4>
+              <p className="text-xs text-gray-400">{(userProfile?.achievements?.length ?? 0)} unlocked</p>
+            </div>
+          </div>
+        </div>
+
         {/* XP Progress Bar */}
         <div className="glass card mb-10 py-4">
           <div className="flex justify-between text-sm font-bold mb-2">
-            <span className="text-violet-300">Level {level} → {level + 1}</span>
-            <span className="text-gray-400">{progress.current} / {progress.needed} XP</span>
+            {progress.maxLevel ? (
+              <span className="text-yellow-400">🏆 MAX LEVEL</span>
+            ) : (
+              <span className="text-violet-300">Level {level} → Level {level + 1}</span>
+            )}
+            <span className="text-gray-400">{xp.toLocaleString()} / {progress.needed.toLocaleString()} XP</span>
           </div>
           <div className="w-full bg-white/10 rounded-full h-3">
             <motion.div
@@ -90,38 +360,136 @@ export default function Dashboard() {
         >
           Choose Your Quest!
         </motion.h1>
-        <p className="text-center text-gray-400 mb-10">
-          Pick a category and earn XP. Top the leaderboard!
+        <p className="text-center text-gray-400 mb-6">
+          Earn XP and top the leaderboard!
         </p>
 
-        {/* Category Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {Object.values(CATEGORIES).map((cat, i) => (
-            <motion.button
-              key={cat.id}
-              custom={i}
-              variants={cardVariants}
-              initial="hidden"
-              animate="visible"
-              whileHover={{ scale: 1.03 }}
-              whileTap={{ scale: 0.97 }}
-              onClick={() => navigate(`/quiz/${cat.id}`)}
-              className={`relative overflow-hidden text-left rounded-3xl p-6 shadow-2xl bg-gradient-to-br ${cat.gradient} group`}
+        {/* Section Tabs */}
+        <div className="flex gap-2 mb-8 p-1 bg-white/5 rounded-2xl border border-white/10">
+          {SECTIONS.map((s) => (
+            <button
+              key={s.id}
+              onClick={() => setSection(s.id)}
+              className="relative flex-1 py-2.5 rounded-xl font-bold text-sm transition-colors"
             >
-              {/* Decorative bubble */}
-              <div className="absolute -top-6 -right-6 w-28 h-28 rounded-full bg-white/10 group-hover:scale-125 transition-transform duration-500" />
-
-              <div className="text-5xl mb-4">{cat.emoji}</div>
-              <h3 className="text-2xl font-extrabold mb-1">{cat.label}</h3>
-              <p className="text-white/70 text-sm">{cat.description}</p>
-
-              <div className="mt-4 inline-flex items-center gap-2 bg-white/20 rounded-full px-4 py-1.5 text-sm font-bold">
-                <Star size={14} fill="white" />
-                100–150 XP per question
-              </div>
-            </motion.button>
+              {section === s.id && (
+                <motion.div
+                  layoutId="section-pill"
+                  className="absolute inset-0 bg-violet-600 rounded-xl"
+                  transition={{ type: 'spring', bounce: 0.25, duration: 0.4 }}
+                />
+              )}
+              <span className="relative z-10">
+                {s.emoji} {s.label}
+              </span>
+            </button>
           ))}
         </div>
+
+        {/* Section Content */}
+        <AnimatePresence mode="wait">
+          {section === 'quizzes' ? (
+            <motion.div
+              key="quizzes"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2 }}
+            >
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                {Object.values(CATEGORIES).map((cat, i) => (
+                  <motion.button
+                    key={cat.id}
+                    custom={i}
+                    variants={cardVariants}
+                    initial="hidden"
+                    animate="visible"
+                    whileHover={{ scale: 1.03 }}
+                    whileTap={{ scale: 0.97 }}
+                    onClick={() => { playSound('click'); navigate(`/quiz/${cat.id}`); }}
+                    className={`relative overflow-hidden text-left rounded-3xl p-6 shadow-2xl bg-gradient-to-br ${cat.gradient} group`}
+                  >
+                    <div className="absolute -top-6 -right-6 w-28 h-28 rounded-full bg-white/10 group-hover:scale-125 transition-transform duration-500" />
+                    <div className="text-5xl mb-4">{cat.emoji}</div>
+                    <h3 className="text-2xl font-extrabold mb-1">{cat.label}</h3>
+                    <p className="text-white/70 text-sm">{cat.description}</p>
+                    <div className="mt-4 inline-flex items-center gap-2 bg-white/20 rounded-full px-4 py-1.5 text-sm font-bold">
+                      <Star size={14} fill="white" />
+                      100–150 XP per question
+                    </div>
+                  </motion.button>
+                ))}
+              </div>
+            </motion.div>
+          ) : section === 'puzzles' ? (
+            <motion.div
+              key="puzzles"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2 }}
+            >
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                {PUZZLE_TILES.map((tile, i) => (
+                  <motion.button
+                    key={tile.id}
+                    custom={i}
+                    variants={cardVariants}
+                    initial="hidden"
+                    animate="visible"
+                    whileHover={{ scale: 1.03 }}
+                    whileTap={{ scale: 0.97 }}
+                    onClick={() => { playSound('click'); navigate(tile.path); }}
+                    className={`relative overflow-hidden text-left rounded-3xl p-6 shadow-2xl bg-gradient-to-br ${tile.gradient} group`}
+                  >
+                    {tile.isNew && (
+                      <div className="absolute top-4 right-4 bg-yellow-400 text-blue-900 text-[10px] font-black px-2 py-0.5 rounded-full z-20 animate-bounce">
+                        NEW
+                      </div>
+                    )}
+                    <div className="absolute -top-6 -right-6 w-28 h-28 rounded-full bg-white/10 group-hover:scale-125 transition-transform duration-500" />
+                    <div className="text-5xl mb-4">{tile.emoji}</div>
+                    <h3 className="text-2xl font-extrabold mb-1">{tile.label}</h3>
+                    <p className="text-white/70 text-sm">{tile.description}</p>
+                    <div className="mt-4 inline-flex items-center gap-2 bg-white/20 rounded-full px-4 py-1.5 text-sm font-bold">
+                      <Zap size={14} fill="white" />
+                      {tile.xpNote}
+                    </div>
+                  </motion.button>
+                ))}
+              </div>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="fun"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2 }}
+            >
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                {DAILY_TILES.map((tile, i) => (
+                  <motion.button
+                    key={tile.id}
+                    custom={i}
+                    variants={cardVariants}
+                    initial="hidden"
+                    animate="visible"
+                    whileHover={{ scale: 1.03 }}
+                    whileTap={{ scale: 0.97 }}
+                    onClick={() => { playSound('click'); navigate(tile.path); }}
+                    className={`relative overflow-hidden text-left rounded-3xl p-6 shadow-2xl bg-gradient-to-br ${tile.gradient} group`}
+                  >
+                    <div className="absolute -top-6 -right-6 w-28 h-28 rounded-full bg-white/10 group-hover:scale-125 transition-transform duration-500" />
+                    <div className="text-5xl mb-4">{tile.emoji}</div>
+                    <h3 className="text-2xl font-extrabold mb-1">{tile.label}</h3>
+                    <p className="text-white/70 text-sm">{tile.description}</p>
+                  </motion.button>
+                ))}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Stats row */}
         <div className="grid grid-cols-3 gap-4 mt-8">

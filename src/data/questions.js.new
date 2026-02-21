@@ -1,0 +1,129 @@
+// ─── XP CONSTANTS ────────────────────────────────────────────────────────────
+export const XP_CORRECT = 100
+export const XP_SPEED_BONUS = 50   // awarded if answered within 10 seconds
+export const XP_STREAK_BONUS = 25  // per streak level (3+)
+export const LEVEL_THRESHOLDS = [0, 500, 1200, 2500, 4500, 7500, 12000, 20000, 30000, 45000, 65000, 90000, 120000, 160000, 200000]
+
+export function calcLevel(xp) {
+  let level = 1
+  for (let i = LEVEL_THRESHOLDS.length - 1; i >= 0; i--) {
+    if (xp >= LEVEL_THRESHOLDS[i]) { level = i + 1; break }
+  }
+  return level
+}
+
+export function xpToNextLevel(xp) {
+  const level = calcLevel(xp)
+  if (level >= LEVEL_THRESHOLDS.length) {
+    // Max level — show full bar
+    return { current: xp, needed: LEVEL_THRESHOLDS[LEVEL_THRESHOLDS.length - 1], percent: 100, maxLevel: true }
+  }
+  const needed = LEVEL_THRESHOLDS[level] // absolute XP for next level
+  return { current: xp, needed, percent: Math.min(100, Math.round((xp / needed) * 100)), maxLevel: false }
+}
+
+// ─── AVATARS ─────────────────────────────────────────────────────────────────
+export const AVATARS = ['🦁', '🐯', '🦊', '🐺', '🐸', '🐧', '🦋', '🐉', '🦄', '🤖', '👽', '🐙']
+
+// ─── CATEGORY META ────────────────────────────────────────────────────────────
+export const CATEGORIES = {
+  flags: {
+    id: 'flags',
+    label: 'World Flags',
+    emoji: '🌍',
+    description: 'Guess the country from its flag!',
+    gradient: 'from-blue-600 to-cyan-500',
+    color: 'bg-blue-500',
+  },
+  science: {
+    id: 'science',
+    label: 'Science',
+    emoji: '🔬',
+    description: 'Space, biology & amazing discoveries',
+    gradient: 'from-green-600 to-emerald-400',
+    color: 'bg-green-500',
+  },
+  tech: {
+    id: 'tech',
+    label: 'Tech & AI',
+    emoji: '🤖',
+    description: 'Robots, coding & the digital world',
+    gradient: 'from-violet-600 to-purple-400',
+    color: 'bg-violet-500',
+  },
+  history: {
+    id: 'history',
+    label: 'History',
+    emoji: '🏛️',
+    description: 'Ancient civilisations & famous explorers',
+    gradient: 'from-orange-600 to-amber-400',
+    color: 'bg-orange-500',
+  },
+  brands: {
+    id: 'brands',
+    label: 'Brand Logos',
+    emoji: '🏷️',
+    description: 'Recognise the world\'s most iconic brands',
+    gradient: 'from-red-600 to-rose-400',
+    color: 'bg-red-500',
+  },
+  emoji: {
+    id: 'emoji',
+    label: 'Emoji Pictionary',
+    emoji: '🎭',
+    description: 'Decode emoji clues to find the answer!',
+    gradient: 'from-yellow-500 to-orange-400',
+    color: 'bg-yellow-500',
+  },
+  landmarks: {
+    id: 'landmarks',
+    label: 'Landmarks',
+    emoji: '🗺️',
+    description: 'Spot famous monuments & travel spots',
+    gradient: 'from-teal-600 to-cyan-400',
+    color: 'bg-teal-500',
+  },
+  dishes: {
+    id: 'dishes',
+    label: 'World Dishes',
+    emoji: '🍜',
+    description: 'Taste-test your food knowledge!',
+    gradient: 'from-pink-600 to-rose-400',
+    color: 'bg-pink-500',
+  },
+  cars: {
+    id: 'cars',
+    label: 'Car Logos',
+    emoji: '🚗',
+    description: 'Rev up and name that car brand!',
+    gradient: 'from-slate-600 to-gray-500',
+    color: 'bg-slate-500',
+  },
+  retro: {
+    id: 'retro',
+    label: 'Before the 90s',
+    emoji: '📼',
+    description: 'Classic items from a pre-digital world',
+    gradient: 'from-indigo-600 to-violet-400',
+    color: 'bg-indigo-500',
+  },
+  animals: {
+    id: 'animals',
+    label: 'Animals',
+    emoji: '🐾',
+    description: 'Wild facts about Earth\'s amazing creatures!',
+    gradient: 'from-lime-600 to-green-400',
+    color: 'bg-lime-500',
+  },
+  superheroes: {
+    id: 'superheroes',
+    label: 'Superheroes',
+    emoji: '🦸',
+    description: 'Test your Marvel & DC knowledge!',
+    gradient: 'from-blue-600 to-violet-500',
+    color: 'bg-blue-600',
+  },
+}
+
+// ─── SCIENCE QUESTIONS ───────────────────────────────────────────────────────
+export const scienceQuestions = [

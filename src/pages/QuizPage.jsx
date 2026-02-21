@@ -4,9 +4,13 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { doc, updateDoc, increment, addDoc, collection, serverTimestamp } from 'firebase/firestore'
 import { db } from '../firebase/config'
 import { useAuth } from '../contexts/AuthContext'
+import confetti from 'canvas-confetti'
+import { useSound } from '../hooks/useSound'
 import {
   STATIC_QUESTIONS,
   fetchFlagQuestions,
+  fetchAPIQuestions,
+  shuffleAndPick,
   CATEGORIES,
   XP_CORRECT,
   XP_SPEED_BONUS,
@@ -21,6 +25,7 @@ export default function QuizPage() {
   const { category } = useParams()
   const navigate = useNavigate()
   const { currentUser, userProfile, setUserProfile } = useAuth()
+  const { playSound } = useSound()
 
   const [questions, setQuestions] = useState([])
   const [loading, setLoading] = useState(true)
@@ -32,23 +37,34 @@ export default function QuizPage() {
   const [results, setResults] = useState([])           // per-question result log
   const [phase, setPhase] = useState('question')       // 'question' | 'feedback' | 'done'
   const [answerTime, setAnswerTime] = useState(null)   // seconds taken to answer
+  const [refreshKey, setRefreshKey] = useState(0)      // increment to reload questions
 
   const cat = CATEGORIES[category]
 
-  // Load questions
+  // Load questions — API-backed for science/tech/history/superheroes, shuffled static for rest
+  const API_CATEGORIES = ['science', 'tech', 'history', 'superheroes']
+
   useEffect(() => {
+    setLoading(true)
     async function load() {
       let qs
       if (category === 'flags') {
         qs = await fetchFlagQuestions()
+      } else if (API_CATEGORIES.includes(category)) {
+        try {
+          const apiQs = await fetchAPIQuestions(category)
+          qs = apiQs.slice(0, 10)
+        } catch {
+          qs = shuffleAndPick(STATIC_QUESTIONS[category] ?? [], 10)
+        }
       } else {
-        qs = STATIC_QUESTIONS[category] ?? []
+        qs = shuffleAndPick(STATIC_QUESTIONS[category] ?? [], 10)
       }
       setQuestions(qs)
       setLoading(false)
     }
     load()
-  }, [category])
+  }, [category, refreshKey])
 
   // Countdown timer
   useEffect(() => {
@@ -75,6 +91,9 @@ export default function QuizPage() {
     const isCorrect = optionIndex === q.correct
     setSelected(optionIndex)
 
+    if (isCorrect) playSound('correct')
+    else playSound('wrong')
+
     let xpGained = 0
     if (isCorrect) {
       xpGained += XP_CORRECT
@@ -100,6 +119,7 @@ export default function QuizPage() {
         await updateDoc(doc(db, 'users', currentUser.uid), {
           totalXP: increment(sessionXP),
           quizzesCompleted: increment(1),
+          dailyQuizzesCount: increment(1),
         })
         // Log quiz history
         await addDoc(collection(db, 'quizHistory'), {
@@ -116,6 +136,7 @@ export default function QuizPage() {
           ...prev,
           totalXP: (prev?.totalXP ?? 0) + sessionXP,
           quizzesCompleted: (prev?.quizzesCompleted ?? 0) + 1,
+          dailyQuizzesCount: (prev?.dailyQuizzesCount ?? 0) + 1,
         }))
       } catch (e) {
         console.error('Error saving results:', e)
@@ -144,8 +165,20 @@ export default function QuizPage() {
     )
   }
 
+  function handlePlayAgain() {
+    setCurrent(0)
+    setSelected(null)
+    setStreak(0)
+    setTimeLeft(QUESTION_TIME)
+    setSessionXP(0)
+    setResults([])
+    setPhase('question')
+    setAnswerTime(null)
+    setRefreshKey((k) => k + 1)
+  }
+
   if (phase === 'done') {
-    return <ResultsScreen results={results} sessionXP={sessionXP} category={cat} navigate={navigate} userProfile={userProfile} />
+    return <ResultsScreen results={results} sessionXP={sessionXP} category={cat} navigate={navigate} userProfile={userProfile} onPlayAgain={handlePlayAgain} />
   }
 
   const q = questions[current]
@@ -211,22 +244,51 @@ export default function QuizPage() {
             transition={{ duration: 0.3 }}
           >
             <div className="glass card mb-5">
+              {q.emoji && (
+                <p className="text-center text-5xl tracking-widest mb-3 leading-snug">{q.emoji}</p>
+              )}
               {q.flagUrl && (
                 <div className="flex justify-center mb-4">
                   <img
                     src={q.flagUrl}
                     alt="Flag"
                     className="h-28 w-auto rounded-xl shadow-lg object-cover border border-white/10"
+                    onError={(e) => { e.currentTarget.parentElement.style.display = 'none' }}
                   />
                 </div>
               )}
               {q.imageUrl && (
-                <div className="flex justify-center mb-4">
+                <div className="flex justify-center mb-4 relative min-h-[160px] bg-white/5 rounded-xl overflow-hidden border border-white/10 shadow-lg">
                   <img
                     src={q.imageUrl}
-                    alt="Landmark"
-                    className="w-full max-h-52 rounded-xl shadow-lg object-cover border border-white/10"
+                    alt="Question image"
+                    className="w-full max-h-64 object-cover transition-opacity duration-300"
+                    onLoad={(e) => { e.currentTarget.style.opacity = '1' }}
+                    style={{ opacity: 0 }}
+                    onError={(e) => {
+                      const target = e.currentTarget;
+                      if (!target.dataset.triedFinal) {
+                        target.dataset.triedFinal = 'true';
+                        target.src = `https://placehold.co/600x400/1e1b4b/white?text=Image+unavailable`;
+                      }
+                    }}
                   />
+                  {/* Skeleton loader overlay */}
+                  <div className="absolute inset-0 bg-white/5 animate-pulse pointer-events-none -z-10 flex items-center justify-center">
+                    <span className="text-white/10">📸</span>
+                  </div>
+                </div>
+              )}
+              {q.logoUrl && (
+                <div className="flex justify-center mb-4">
+                  <div className="bg-white rounded-2xl p-5 shadow-lg flex items-center justify-center" style={{ minWidth: 160, minHeight: 120 }}>
+                    <img
+                      src={q.logoUrl}
+                      alt="Logo"
+                      className="max-h-24 max-w-[200px] object-contain"
+                      onError={(e) => { e.currentTarget.parentElement.parentElement.style.display = 'none' }}
+                    />
+                  </div>
                 </div>
               )}
               <p className="text-lg md:text-xl font-extrabold text-center leading-snug">
@@ -268,9 +330,9 @@ export default function QuizPage() {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0 }}
-                  className="mt-5"
+                  className="mt-5 mb-28"
                 >
-                  <div className={`glass card py-4 mb-4 border-l-4 ${selected === q.correct ? 'border-green-400' : 'border-red-400'}`}>
+                  <div className={`glass card py-4 border-l-4 ${selected === q.correct ? 'border-green-400' : 'border-red-400'}`}>
                     <p className={`font-black text-lg mb-1 ${selected === q.correct ? 'text-green-400' : 'text-red-400'}`}>
                       {selected === q.correct ? '🎉 Correct!' : '❌ Not quite!'}
                     </p>
@@ -293,21 +355,37 @@ export default function QuizPage() {
                       </div>
                     )}
                   </div>
-                  <button onClick={nextQuestion} className="btn-primary w-full text-center text-lg">
-                    {current === questions.length - 1 ? 'See Results 🏆' : 'Next Question →'}
-                  </button>
                 </motion.div>
               )}
             </AnimatePresence>
           </motion.div>
         </AnimatePresence>
       </div>
+
+      {/* Fixed Next button — stays at bottom of screen during feedback, no layout shift on mobile */}
+      <AnimatePresence>
+        {phase === 'feedback' && (
+          <motion.div
+            initial={{ y: 100, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 100, opacity: 0 }}
+            transition={{ type: 'spring', bounce: 0.25, duration: 0.4 }}
+            className="fixed bottom-0 left-0 right-0 px-4 pb-6 pt-4 bg-gradient-to-t from-gray-950 via-gray-950/95 to-transparent z-40"
+          >
+            <div className="max-w-2xl mx-auto">
+              <button onClick={nextQuestion} className="btn-primary w-full text-center text-lg">
+                {current === questions.length - 1 ? 'See Results 🏆' : 'Next Question →'}
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
 
 // ─── Results Screen ───────────────────────────────────────────────────────────
-function ResultsScreen({ results, sessionXP, category, navigate, userProfile }) {
+function ResultsScreen({ results, sessionXP, navigate, userProfile, onPlayAgain }) {
   const correct = results.filter((r) => r.correct).length
   const total = results.length
   const pct = Math.round((correct / total) * 100)
@@ -316,6 +394,34 @@ function ResultsScreen({ results, sessionXP, category, navigate, userProfile }) 
   const prevLevel = calcLevel(prevXP)
   const newLevel = calcLevel(newXP)
   const leveledUp = newLevel > prevLevel
+
+  useEffect(() => {
+    if (pct >= 80) {
+      const duration = 3 * 1000;
+      const animationEnd = Date.now() + duration;
+      const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 0 };
+
+      const randomInRange = (min, max) => Math.random() * (max - min) + min;
+
+      const interval = setInterval(function() {
+        const timeLeft = animationEnd - Date.now();
+
+        if (timeLeft <= 0) {
+          return clearInterval(interval);
+        }
+
+        const particleCount = 50 * (timeLeft / duration);
+        confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } });
+        confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } });
+      }, 250);
+    } else if (pct >= 50) {
+      confetti({
+        particleCount: 100,
+        spread: 70,
+        origin: { y: 0.6 }
+      });
+    }
+  }, [pct]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-950 via-violet-950 to-gray-950 flex items-center justify-center px-4">
@@ -366,7 +472,7 @@ function ResultsScreen({ results, sessionXP, category, navigate, userProfile }) 
 
         <div className="flex gap-3 flex-col sm:flex-row">
           <button
-            onClick={() => navigate(`/quiz/${category.id}`)}
+            onClick={onPlayAgain}
             className="btn-primary flex-1"
           >
             Play Again

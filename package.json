@@ -11,6 +11,8 @@
     "deploy": "npm run build && firebase deploy --only hosting"
   },
   "dependencies": {
+    "canvas-confetti": "^1.9.4",
+    "chess.js": "^1.4.0",
     "firebase": "^12.9.0",
     "framer-motion": "^12.34.2",
     "lucide-react": "^0.574.0",
