@@ -8,6 +8,8 @@ import { doc, updateDoc, increment } from 'firebase/firestore'
 import { db } from '../firebase/config'
 import { generateEnglishQuestions } from '../data/englishWords'
 
+import { saveMistake } from '../firebase/mistakes'
+
 const TOPICS = [
   { id: 'meanings',  label: 'Meanings',  emoji: '📖', desc: 'What does the word mean?' },
   { id: 'synonyms',  label: 'Synonyms',  emoji: '🔁', desc: 'Same-meaning words' },
@@ -59,7 +61,10 @@ export default function EnglishQuest() {
     setChosen(optIdx)
     const correct = optIdx === questions[idx].correct
     if (correct) { playSound('correct'); setScore(s => s + 1) }
-    else { playSound('wrong') }
+    else { 
+      playSound('wrong');
+      saveMistake(currentUser?.uid || 'guest', questions[idx]);
+    }
     setShowFact(true)
   }
 

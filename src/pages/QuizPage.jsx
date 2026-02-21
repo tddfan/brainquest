@@ -19,6 +19,8 @@ import {
 } from '../data/questions'
 import { ArrowLeft, Zap, Flame, Clock } from 'lucide-react'
 
+import { saveMistake } from '../firebase/mistakes'
+
 const QUESTION_TIME = 20 // seconds per question
 
 export default function QuizPage() {
@@ -99,7 +101,11 @@ export default function QuizPage() {
     setSelected(optionIndex)
 
     if (isCorrect) playSound('correct')
-    else playSound('wrong')
+    else {
+      playSound('wrong')
+      // Save to My Mistakes Room
+      saveMistake(currentUser?.uid || 'guest', q)
+    }
 
     let xpGained = 0
     if (isCorrect) {

@@ -15,6 +15,7 @@ import ChessPage from './pages/ChessPage'
 import Millionaire from './pages/Millionaire'
 import DailyFun from './pages/DailyFun'
 import Shop from './pages/Shop'
+import MistakesRoom from './pages/MistakesRoom'
 import MathsQuest from './pages/MathsQuest'
 import EnglishQuest from './pages/EnglishQuest'
 import MemoryGame from './pages/MemoryGame'
@@ -124,6 +125,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <Shop />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/mistakes"
+            element={
+              <ProtectedRoute allowGuest={true}>
+                <MistakesRoom />
               </ProtectedRoute>
             }
           />

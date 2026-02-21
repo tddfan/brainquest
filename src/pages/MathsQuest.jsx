@@ -7,6 +7,8 @@ import { useSound } from '../hooks/useSound'
 import { doc, updateDoc, increment } from 'firebase/firestore'
 import { db } from '../firebase/config'
 
+import { saveMistake } from '../firebase/mistakes'
+
 const DURATION = 60
 
 const AGE_GROUPS = [
@@ -190,6 +192,11 @@ export default function MathsQuest() {
       playSound('correct'); setFlash('correct'); scoreRef.current++; setScore(s => s + 1)
     } else {
       playSound('wrong'); setFlash('wrong')
+      saveMistake(currentUser?.uid || 'guest', {
+        ...question,
+        category: 'maths',
+        type: 'Maths Challenge'
+      })
     }
     // Small delay to show the feedback, then load next
     setTimeout(nextQuestion, 600)
