@@ -1,13 +1,13 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Clock, Zap, Trophy, RotateCcw, Target, User, Star } from 'lucide-react'
+import { ArrowLeft, Clock, Zap, Trophy, RotateCcw, Target, User, Star, Swords, Check, Share2 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useSound } from '../hooks/useSound'
-import { doc, updateDoc, increment } from 'firebase/firestore'
+import { doc, updateDoc, increment, addDoc, collection, serverTimestamp, getDoc } from 'firebase/firestore'
 import { db } from '../firebase/config'
-
 import { saveMistake } from '../firebase/mistakes'
+import { AVATARS } from '../data/questions'
 
 const DURATION = 60
 
@@ -120,7 +120,7 @@ function makeOptions(ans) {
 
 export default function MathsQuest() {
   const navigate = useNavigate()
-  const { currentUser, setUserProfile, isGuest } = useAuth()
+  const { currentUser, userProfile, setUserProfile } = useAuth()
   const { playSound } = useSound()
 
   const [phase, setPhase] = useState('setup') 
@@ -132,6 +132,11 @@ export default function MathsQuest() {
   const [timeLeft, setTimeLeft] = useState(DURATION)
   const [score, setScore] = useState(0)
   const [flash, setFlash] = useState(null)
+  const [history, setHistory] = useState([]) // Capture questions for duels
+  const [friends, setFriends] = useState([])
+  const [sentTo, setSentTo] = useState([])
+  const [duelLink, setDuelLink] = useState(null)
+  const [creatingDuel, setCreatingDuel] = useState(false)
   
   const scoreRef = useRef(0)
   const timerRef = useRef(null)
@@ -140,23 +145,33 @@ export default function MathsQuest() {
   const bestKey = `mq_best_${ageGroup}_${level}`
   const bestScore = parseInt(localStorage.getItem(bestKey) || '0')
 
+  // Load friends for duels
+  useEffect(() => {
+    async function loadFriends() {
+      if (!userProfile?.friends?.length) return
+      const friendData = []
+      for (const fuid of userProfile.friends) {
+        const snap = await getDoc(doc(db, 'users', fuid))
+        if (snap.exists()) friendData.push(snap.data())
+      }
+      setFriends(friendData)
+    }
+    if (phase === 'ended') loadFriends()
+  }, [phase, userProfile])
+
   function nextQuestion() {
-    // CRITICAL: Reset flash BEFORE setting new question to prevent highlight bleed
     setFlash(null)
     const q = currentConfig.gen()
+    const opts = makeOptions(q.ans)
+    const fullQ = { ...q, options: opts }
     setQuestion(q)
-    setOptions(makeOptions(q.ans))
+    setOptions(opts)
+    setHistory(prev => [...prev, fullQ])
   }
 
   function startGame() {
-    scoreRef.current = 0
-    setScore(0)
-    setTimeLeft(DURATION)
-    setFlash(null)
-    const q = currentConfig.gen()
-    setQuestion(q)
-    setOptions(makeOptions(q.ans))
-    setPhase('playing')
+    scoreRef.current = 0; setScore(0); setTimeLeft(DURATION); setFlash(null); setHistory([]); setSentTo([]); setDuelLink(null);
+    nextQuestion(); setPhase('playing');
   }
 
   useEffect(() => {
@@ -176,10 +191,11 @@ export default function MathsQuest() {
     const xpEarned = finalScore * currentConfig.xp
     if (finalScore > bestScore) localStorage.setItem(bestKey, finalScore.toString())
     if (xpEarned === 0) return
-    if (!isGuest && currentUser) {
+    if (currentUser) {
       updateDoc(doc(db, 'users', currentUser.uid), { 
         totalXP: increment(xpEarned),
-        dailyXP: increment(xpEarned)
+        dailyXP: increment(xpEarned),
+        mathsCompleted: increment(1)
       }).catch(() => {})
     }
     setUserProfile(prev => ({ ...prev, totalXP: (prev?.totalXP ?? 0) + xpEarned }))
@@ -187,19 +203,54 @@ export default function MathsQuest() {
 
   function handleAnswer(opt) {
     if (flash) return
-    const correct = opt === question.ans
-    if (correct) {
+    if (opt === question.ans) {
       playSound('correct'); setFlash('correct'); scoreRef.current++; setScore(s => s + 1)
+      // Deal damage to Global Boss
+      updateDoc(doc(db, 'global', 'boss'), { hp: increment(-10) }).catch(() => {})
     } else {
       playSound('wrong'); setFlash('wrong')
-      saveMistake(currentUser?.uid || 'guest', {
-        ...question,
-        category: 'maths',
-        type: 'Maths Challenge'
-      })
+      saveMistake(currentUser?.uid || 'guest', { ...question, category: 'maths', type: 'Maths Challenge', options })
     }
-    // Small delay to show the feedback, then load next
     setTimeout(nextQuestion, 600)
+  }
+
+  const inviteFriend = async (friend) => {
+    if (sentTo.includes(friend.uid)) return
+    try {
+      const duelData = {
+        creatorUid: userProfile.uid,
+        creatorName: userProfile.username,
+        creatorScore: score,
+        category: 'maths',
+        questions: history,
+        timestamp: serverTimestamp(),
+      }
+      const docRef = await addDoc(collection(db, 'duels'), duelData)
+      await addDoc(collection(db, 'invites'), {
+        fromName: userProfile.username, fromUid: userProfile.uid, toUid: friend.uid,
+        duelId: docRef.id, categoryEmoji: '🔢', categoryLabel: 'Maths Quest',
+        status: 'pending', timestamp: serverTimestamp()
+      })
+      setSentTo(prev => [...prev, friend.uid]); playSound('claim');
+    } catch (e) { console.error(e) }
+  }
+
+  const createDuelLink = async () => {
+    setCreatingDuel(true)
+    try {
+      const duelData = {
+        creatorUid: userProfile.uid, creatorName: userProfile.username,
+        creatorScore: score, category: 'maths', questions: history, timestamp: serverTimestamp(),
+      }
+      const docRef = await addDoc(collection(db, 'duels'), duelData)
+      const link = `${window.location.origin}/duel/${docRef.id}`
+      if (navigator.share) {
+        await navigator.share({ title: 'BrainQuest Maths Duel!', text: `I solved ${score} maths problems in 60s! Can you beat me?`, url: link })
+      } else {
+        setDuelLink(link)
+      }
+    } catch (e) { console.error(e) }
+    setCreatingDuel(false)
   }
 
   return (
@@ -216,92 +267,45 @@ export default function MathsQuest() {
                 <h1 className="text-5xl font-black mb-2 bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent uppercase tracking-tighter">Maths Quest</h1>
                 <p className="text-gray-400 font-bold uppercase text-xs tracking-[0.2em]">The 60-Second Brain Sprint</p>
               </div>
-
               <div className="flex gap-2 mb-8 bg-white/5 p-1.5 rounded-3xl border border-white/10">
                 {AGE_GROUPS.map(g => (
-                  <button key={g.id} onClick={() => { setAgeGroup(g.id); setLevel(1); }}
-                    className={`flex-1 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all ${ageGroup === g.id ? 'bg-violet-600 text-white shadow-xl shadow-violet-600/20' : 'text-gray-500 hover:text-gray-300'}`}
-                  >
+                  <button key={g.id} onClick={() => { setAgeGroup(g.id); setLevel(1); }} className={`flex-1 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all ${ageGroup === g.id ? 'bg-violet-600 text-white shadow-xl' : 'text-gray-500 hover:text-gray-300'}`}>
                     <div className="text-2xl mb-1">{g.emoji}</div> {g.label}
                   </button>
                 ))}
               </div>
-
               <div className="grid grid-cols-1 gap-3 mb-10 max-h-[40vh] overflow-y-auto custom-scrollbar pr-2">
                 {[1,2,3,4,5,6].map(l => (
-                  <button key={l} onClick={() => setLevel(l)}
-                    className={`w-full glass card p-4 text-left flex items-center gap-4 border-2 transition-all ${level === l ? 'border-violet-500 bg-violet-500/25 scale-[1.02] shadow-xl' : 'border-transparent opacity-60 hover:opacity-100'}`}
-                  >
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-lg ${level === l ? 'bg-violet-500 text-white' : 'bg-white/10 text-gray-400'}`}>
-                      {l === 6 ? <Star size={18} fill="currentColor" /> : l}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h4 className="font-black text-base truncate">{LEVELS[ageGroup][l].label}</h4>
-                      <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{LEVELS[ageGroup][l].desc}</p>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-violet-400 font-black text-[10px]">+{LEVELS[ageGroup][l].xp} XP</div>
-                    </div>
+                  <button key={l} onClick={() => setLevel(l)} className={`w-full glass card p-4 text-left flex items-center gap-4 border-2 transition-all ${level === l ? 'border-violet-500 bg-violet-500/25 scale-[1.02] shadow-xl' : 'border-transparent opacity-60 hover:opacity-100'}`}>
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-lg ${level === l ? 'bg-violet-500 text-white' : 'bg-white/10 text-gray-400'}`}>{l === 6 ? <Star size={18} fill="currentColor" /> : l}</div>
+                    <div className="flex-1 min-w-0"><h4 className="font-black text-base truncate">{LEVELS[ageGroup][l].label}</h4><p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest truncate">{LEVELS[ageGroup][l].desc}</p></div>
+                    <div className="text-right"><div className="text-violet-400 font-black text-[10px]">+{LEVELS[ageGroup][l].xp} XP</div></div>
                   </button>
                 ))}
               </div>
-
-              {bestScore > 0 && (
-                <div className="bg-yellow-400/10 border border-yellow-400/20 rounded-2xl p-4 mb-8 flex items-center justify-center gap-3">
-                  <Trophy className="text-yellow-400" size={24} />
-                  <div>
-                    <p className="text-xs font-black text-yellow-400/60 uppercase tracking-widest">Goal to beat</p>
-                    <p className="text-xl font-black text-yellow-400">{bestScore} Correct <span className="text-sm opacity-60">in 60s</span></p>
-                  </div>
-                </div>
-              )}
-
-              <button onClick={startGame} className="w-full bg-gradient-to-r from-yellow-400 to-orange-500 text-gray-950 font-black py-6 rounded-[2rem] text-2xl hover:scale-105 active:scale-95 transition-all shadow-2xl shadow-orange-500/20 uppercase tracking-tighter">
-                Start Quest ⚡
-              </button>
+              <button onClick={startGame} className="w-full bg-gradient-to-r from-yellow-400 to-orange-500 text-gray-950 font-black py-6 rounded-[2rem] text-2xl hover:scale-105 active:scale-95 transition-all shadow-2xl uppercase tracking-tighter">Start Quest ⚡</button>
             </motion.div>
           )}
 
           {phase === 'playing' && question && (
             <motion.div key="playing" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
               <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-3 glass card px-6 py-3 border-white/10">
-                  <Target size={24} className="text-yellow-400" />
-                  <span className="font-black text-3xl">{score}</span>
-                </div>
+                <div className="flex items-center gap-3 glass card px-6 py-3 border-white/10"><Target size={24} className="text-yellow-400" /> <span className="font-black text-3xl">{score}</span></div>
                 <div className={`flex flex-col items-end gap-1 ${timeLeft <= 10 ? 'animate-pulse' : ''}`}>
-                  <div className="flex items-center gap-2">
-                    <Clock size={20} className={timeLeft <= 10 ? 'text-red-500' : 'text-violet-400'} />
-                    <span className={`font-black text-3xl tabular-nums ${timeLeft <= 10 ? 'text-red-500' : ''}`}>{timeLeft}s</span>
-                  </div>
-                  <div className="w-32 bg-white/10 h-1.5 rounded-full overflow-hidden">
-                    <motion.div className="h-full bg-violet-500" animate={{ width: `${(timeLeft/DURATION)*100}%` }} />
-                  </div>
+                  <div className="flex items-center gap-2"><Clock size={20} className={timeLeft <= 10 ? 'text-red-500' : 'text-violet-400'} /><span className={`font-black text-3xl tabular-nums ${timeLeft <= 10 ? 'text-red-500' : ''}`}>{timeLeft}s</span></div>
+                  <div className="w-32 bg-white/10 h-1.5 rounded-full overflow-hidden"><motion.div className="h-full bg-violet-500" animate={{ width: `${(timeLeft/DURATION)*100}%` }} /></div>
                 </div>
               </div>
-
-              <motion.div key={question.q} initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
-                className={`glass card p-8 text-center mb-8 border-4 transition-all duration-200 ${flash==='correct'?'border-green-500 bg-green-500/10':flash==='wrong'?'border-red-500 bg-red-500/10':'border-white/10 shadow-2xl'}`}
-              >
-                <h2 className="text-4xl md:text-5xl font-black tracking-tight">{question.q}</h2>
-              </motion.div>
-
+              <motion.div key={question.q} initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className={`glass card p-8 text-center mb-8 border-4 transition-all duration-200 ${flash==='correct'?'border-green-500 bg-green-500/10':flash==='wrong'?'border-red-500 bg-red-500/10':'border-white/10'}`}><h2 className="text-4xl md:text-5xl font-black tracking-tight">{question.q}</h2></motion.div>
               <div className="grid grid-cols-2 gap-4">
                 {options.map((opt, i) => {
-                  let borderCls = 'border-transparent'
-                  if (flash === 'correct' && opt === question.ans) borderCls = 'border-green-500 bg-green-500/20'
+                  let border = 'border-transparent'
+                  if (flash === 'correct' && opt === question.ans) border = 'border-green-500 bg-green-500/20'
                   if (flash === 'wrong') {
-                    if (opt === question.ans) borderCls = 'border-green-500 bg-green-500/20 animate-pulse'
-                    else borderCls = 'border-red-500 bg-red-500/20 opacity-50'
+                    if (opt === question.ans) border = 'border-green-500 bg-green-500/20 animate-pulse'
+                    else border = 'border-red-500 bg-red-500/20 opacity-50'
                   }
-
-                  return (
-                    <button key={i} onClick={() => handleAnswer(opt)} disabled={!!flash}
-                      className={`glass card py-8 text-4xl font-black rounded-3xl hover:bg-violet-600/20 hover:border-violet-500 border-2 transition-all active:scale-95 disabled:cursor-default ${borderCls}`}
-                    >
-                      {opt}
-                    </button>
-                  )
+                  return <button key={i} onClick={() => handleAnswer(opt)} disabled={!!flash} className={`glass card py-8 text-4xl font-black rounded-3xl hover:bg-violet-600/20 hover:border-violet-500 border-2 transition-all active:scale-95 disabled:cursor-default ${border}`}>{opt}</button>
                 })}
               </div>
             </motion.div>
@@ -309,21 +313,38 @@ export default function MathsQuest() {
 
           {phase === 'ended' && (
             <motion.div key="ended" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="text-center">
-              <div className="glass card p-12 mb-8 border-white/10 shadow-2xl">
-                <div className="text-8xl mb-6">{score >= 15 ? '👑' : score >= 8 ? '🌟' : '🔥'}</div>
-                <h2 className="text-5xl font-black mb-2 uppercase tracking-tighter">Time&apos;s Up!</h2>
-                <p className="text-gray-400 font-bold mb-8 uppercase tracking-widest text-sm">You solved {score} challenges</p>
+              <div className="glass card p-10 mb-6 border-white/10 shadow-2xl">
+                <div className="text-7xl mb-4">{score >= 15 ? '👑' : score >= 8 ? '🌟' : '🔥'}</div>
+                <h2 className="text-4xl font-black mb-2 uppercase tracking-tighter">Sprint Finish!</h2>
                 <div className="text-6xl font-black text-yellow-400 mb-2">+{score * currentConfig.xp} XP</div>
-                {score > bestScore && score > 0 && <div className="text-green-400 font-black text-sm uppercase tracking-widest animate-bounce mt-4">New Record Set! 🏆</div>}
+                
+                {/* Challenge Section */}
+                <div className="mt-8 pt-8 border-t border-white/10">
+                  {!duelLink ? (
+                    <button onClick={createDuelLink} disabled={creatingDuel} className="w-full py-4 bg-blue-600 hover:bg-blue-500 rounded-2xl font-black text-lg flex items-center justify-center gap-3 active:scale-95 transition-all"><Swords size={20}/> {creatingDuel ? 'Preparing Duel...' : 'CHALLENGE A FRIEND'}</button>
+                  ) : (
+                    <button onClick={() => { navigator.clipboard.writeText(duelLink); alert("Link copied!"); }} className="w-full py-4 bg-green-600 hover:bg-green-500 rounded-2xl font-black text-lg flex items-center justify-center gap-3"><Share2 size={20}/> COPY DUEL LINK</button>
+                  )}
+
+                  {friends.length > 0 && (
+                    <div className="mt-6 bg-white/5 p-4 rounded-[2rem] border border-white/5">
+                      <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-3">Direct Challenge</p>
+                      <div className="flex gap-3 overflow-x-auto pb-2 custom-scrollbar">
+                        {friends.map(f => (
+                          <button key={f.uid} onClick={() => inviteFriend(f)} disabled={sentTo.includes(f.uid)} className="flex flex-col items-center gap-1 flex-shrink-0 group">
+                            <div className={`w-12 h-12 rounded-full flex items-center justify-center text-2xl border-2 transition-all ${sentTo.includes(f.uid) ? 'border-green-500 bg-green-500/20' : 'border-white/10 bg-white/5 group-hover:border-blue-500'}`}>{sentTo.includes(f.uid) ? <Check size={20} className="text-green-400" /> : AVATARS[f.avatarIndex ?? 0]}</div>
+                            <span className="text-[10px] font-bold text-gray-400 truncate w-12">{f.username}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
 
-              <div className="grid gap-4">
-                <button onClick={startGame} className="bg-white text-gray-950 py-5 rounded-3xl font-black text-xl flex items-center justify-center gap-3 hover:bg-gray-200 transition-colors">
-                  <RotateCcw size={24} /> Play Again
-                </button>
-                <button onClick={() => setPhase('setup')} className="glass card py-5 rounded-3xl font-black text-xl hover:bg-white/10 transition-colors">
-                  Change Level
-                </button>
+              <div className="grid grid-cols-2 gap-4">
+                <button onClick={startGame} className="bg-white text-gray-950 py-5 rounded-3xl font-black text-xl flex items-center justify-center gap-3 hover:bg-gray-200 transition-colors"><RotateCcw size={24} /> Again</button>
+                <button onClick={() => setPhase('setup')} className="glass card py-5 rounded-3xl font-black text-xl hover:bg-white/10 transition-colors">Setup</button>
               </div>
             </motion.div>
           )}

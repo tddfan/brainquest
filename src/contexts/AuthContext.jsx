@@ -5,7 +5,7 @@ import {
   signOut,
   onAuthStateChanged,
 } from 'firebase/auth'
-import { doc, setDoc, getDoc, serverTimestamp, collection, query, where, getDocs } from 'firebase/firestore'
+import { doc, setDoc, getDoc, serverTimestamp, collection, query, where, getDocs, updateDoc } from 'firebase/firestore'
 import { auth, db } from '../firebase/config'
 
 const AuthContext = createContext(null)
@@ -31,6 +31,9 @@ export function AuthProvider({ children }) {
     unlockedAvatars: [0],
     totalXP: 0,
     level: 1,
+    currentStreak: 0,
+    lastLoginDate: null,
+    title: 'Novice Explorer',
     quizzesCompleted: 0,
     puzzlesCompleted: 0,
     isGuest: true
@@ -47,10 +50,14 @@ export function AuthProvider({ children }) {
       uid: user.uid,
       email,
       username,
+      username_low: username.toLowerCase(),
       avatarIndex,
       unlockedAvatars: [avatarIndex],
       totalXP: carryOverXP,
       level: 1,
+      currentStreak: 1,
+      lastLoginDate: new Date(),
+      title: 'Quest Newbie',
       quizzesCompleted: isGuest ? (userProfile?.quizzesCompleted ?? 0) : 0,
       puzzlesCompleted: isGuest ? (userProfile?.puzzlesCompleted ?? 0) : 0,
       dailyQuizzesCount: isGuest ? (userProfile?.dailyQuizzesCount ?? 0) : 0,
@@ -138,7 +145,33 @@ export function AuthProvider({ children }) {
         if (!userProfile) {
           const snap = await getDoc(doc(db, 'users', user.uid))
           if (snap.exists()) {
-            setUserProfile(snap.data())
+            const data = snap.data()
+            
+            // Streak Logic
+            const lastLogin = data.lastLoginDate?.toDate ? data.lastLoginDate.toDate() : null
+            const today = new Date()
+            today.setHours(0,0,0,0)
+            
+            if (lastLogin) {
+              lastLogin.setHours(0,0,0,0)
+              const diffDays = Math.floor((today - lastLogin) / (1000 * 60 * 60 * 24))
+              
+              if (diffDays === 1) {
+                // Consecutive day
+                const newStreak = (data.currentStreak || 0) + 1
+                await updateDoc(doc(db, 'users', user.uid), { currentStreak: newStreak, lastLoginDate: today })
+                data.currentStreak = newStreak
+              } else if (diffDays > 1) {
+                // Streak broken
+                await updateDoc(doc(db, 'users', user.uid), { currentStreak: 1, lastLoginDate: today })
+                data.currentStreak = 1
+              }
+            } else {
+              await updateDoc(doc(db, 'users', user.uid), { currentStreak: 1, lastLoginDate: today })
+              data.currentStreak = 1
+            }
+
+            setUserProfile(data)
           }
         }
       } else {

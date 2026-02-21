@@ -3,11 +3,12 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { CATEGORIES, AVATARS, calcLevel, xpToNextLevel } from '../data/questions'
-import { Trophy, LogOut, Star, Info, X, Zap, Gift, Target, Award, ShoppingBag, Lock, Check, RotateCcw, Download, Share } from 'lucide-react'
+import { Trophy, LogOut, Star, Info, X, Zap, Gift, Target, Award, ShoppingBag, Lock, Check, RotateCcw, Download, Share, Users, Swords, Flame, Bell } from 'lucide-react'
 import confetti from 'canvas-confetti'
-import { doc, updateDoc, increment } from 'firebase/firestore'
+import { doc, updateDoc, increment, onSnapshot, setDoc, getDoc, query, collection, where } from 'firebase/firestore'
 import { db } from '../firebase/config'
 import { useSound } from '../hooks/useSound'
+import { PREMIUM_AVATARS, MYSTERY_PETS } from '../data/shop'
 
 const SECTIONS = [
   { id: 'learn',   label: 'Learn',    emoji: '📚' },
@@ -54,19 +55,57 @@ export default function Dashboard() {
   const [deferredPrompt, setDeferredPrompt] = useState(null)
   const [isIOS, setIsIOS] = useState(false)
   const [showIOSGuide, setShowIOSGuide] = useState(false)
+  const [boss, setBoss] = useState(null)
+  const [invites, setInvites] = useState([])
 
   useEffect(() => {
-    // Standard PWA Install (Android/PC)
     const handler = (e) => { e.preventDefault(); setDeferredPrompt(e); }
     window.addEventListener('beforeinstallprompt', handler)
-    
-    // iOS Detection
     const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
     if (ios && !isStandalone) setIsIOS(true);
-
     return () => window.removeEventListener('beforeinstallprompt', handler)
   }, [])
+
+  // Listen to Global Boss HP and Auto-Initialize
+  useEffect(() => {
+    const bossRef = doc(db, 'global', 'boss')
+    const unsub = onSnapshot(bossRef, (snap) => {
+      if (snap.exists()) {
+        setBoss(snap.data())
+      } else {
+        // Initialize boss if missing
+        setDoc(bossRef, {
+          name: 'The Knowledge Monster',
+          hp: 10000,
+          maxHp: 10000,
+          level: 1,
+          active: true
+        })
+      }
+    })
+    return () => unsub()
+  }, [])
+
+  // Listen to Pending Duel Invites
+  useEffect(() => {
+    if (!currentUser) return
+    const q = query(collection(db, 'invites'), 
+      where('toUid', '==', currentUser.uid), 
+      where('status', '==', 'pending')
+    )
+    const unsub = onSnapshot(q, (snap) => {
+      setInvites(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+    })
+    return () => unsub()
+  }, [currentUser])
+
+  const acceptInvite = async (inv) => {
+    try {
+      await updateDoc(doc(db, 'invites', inv.id), { status: 'accepted' })
+      navigate(`/duel/${inv.duelId}`)
+    } catch (e) { console.error(e) }
+  }
 
   const handleInstall = async () => {
     if (!deferredPrompt) return
@@ -113,7 +152,8 @@ export default function Dashboard() {
       const bonus = 500
       try {
         if (!userProfile.isGuest && currentUser) {
-          await updateDoc(doc(db, 'users', currentUser.uid), { totalXP: increment(bonus), dailyXP: increment(bonus), dailyQuestClaimed: true })
+          const userRef = doc(db, 'users', currentUser.uid)
+          await updateDoc(userRef, { totalXP: increment(bonus), dailyXP: increment(bonus), dailyQuestClaimed: true })
         }
         setUserProfile(prev => ({ ...prev, totalXP: (prev?.totalXP ?? 0) + bonus, dailyXP: (prev?.dailyXP ?? 0) + bonus, dailyQuestClaimed: true }))
         playSound('achievement'); confetti({ particleCount: 200, spread: 80, origin: { y: 0.6 }, colors: ['#f59e0b', '#fbbf24', '#ffffff'] })
@@ -135,8 +175,7 @@ export default function Dashboard() {
   }
 
   async function handleLogout() {
-    await logout()
-    navigate('/login')
+    await logout(); navigate('/login');
   }
 
   if (!userProfile) return <div className="min-h-screen bg-gray-950 flex items-center justify-center"><div className="w-12 h-12 border-4 border-violet-500 border-t-transparent rounded-full animate-spin" /></div>
@@ -144,7 +183,12 @@ export default function Dashboard() {
   const xp = userProfile.totalXP ?? 0
   const level = calcLevel(xp)
   const progress = xpToNextLevel(xp)
-  const avatar = AVATARS[userProfile.avatarIndex ?? 0] || '🦁'
+  
+  const avatar = typeof userProfile?.avatarIndex === 'number' 
+    ? AVATARS[userProfile.avatarIndex] 
+    : (PREMIUM_AVATARS.find(a => a.id === userProfile?.avatarIndex)?.emoji || 
+       MYSTERY_PETS.find(p => p.id === userProfile?.avatarIndex)?.emoji ||
+       AVATARS[0])
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-950 via-violet-950 to-gray-950 px-4 py-6 relative overflow-x-hidden">
@@ -196,6 +240,26 @@ export default function Dashboard() {
       </AnimatePresence>
 
       <div className="max-w-4xl mx-auto">
+        {/* Duel Inbox */}
+        <AnimatePresence>
+          {invites.length > 0 && (
+            <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="mb-6 space-y-2">
+              {invites.map(inv => (
+                <div key={inv.id} className="glass card p-4 flex items-center justify-between border-blue-500/40 bg-blue-500/10">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-blue-500/20 rounded-xl text-blue-400 animate-bounce"><Bell size={18} /></div>
+                    <div>
+                      <p className="text-xs font-black uppercase tracking-widest text-blue-300">New Duel Challenge!</p>
+                      <p className="text-sm font-bold text-white">{inv.fromName} in {inv.categoryEmoji} {inv.categoryLabel}</p>
+                    </div>
+                  </div>
+                  <button onClick={() => acceptInvite(inv)} className="bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded-xl font-black text-xs uppercase transition-all shadow-lg shadow-blue-600/20">Accept</button>
+                </div>
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         <div className="flex items-center justify-between mb-6 bg-white/5 p-3 rounded-[2rem] border border-white/10">
           <div className="flex items-center gap-3">
             <div className={`text-4xl sm:text-5xl cursor-pointer hover:scale-110 transition-transform ${userProfile.isGuest ? 'cursor-default hover:scale-100' : ''}`} onClick={() => { if (!userProfile.isGuest) navigate('/profile'); }}>{avatar}</div>
@@ -205,6 +269,8 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <button onClick={() => navigate('/social')} className="p-2.5 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 rounded-full border border-blue-500/20 transition-all active:scale-90" title="Social Club"><Users size={18} /></button>
+            <button onClick={() => navigate('/leaderboard')} className="p-2.5 bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-500 rounded-full border border-yellow-500/20 transition-all active:scale-90" title="Leaderboard"><Trophy size={18} /></button>
             {(deferredPrompt || isIOS) && (
               <button onClick={isIOS ? () => setShowIOSGuide(true) : handleInstall} className="p-2.5 bg-yellow-500 text-black rounded-full shadow-lg shadow-yellow-500/20 active:scale-90 transition-all"><Download size={18} strokeWidth={3} /></button>
             )}
@@ -212,6 +278,43 @@ export default function Dashboard() {
             <button onClick={() => setShowLogoutConfirm(true)} className="p-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-full border border-red-500/20 transition-all active:scale-90"><LogOut size={18} /></button>
           </div>
         </div>
+
+        {/* Global Boss Bar */}
+        {boss && boss.hp > 0 && (
+          <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="mb-6 relative group">
+            <div className="absolute -inset-0.5 bg-gradient-to-r from-red-600 to-orange-600 rounded-2xl blur opacity-20 group-hover:opacity-40 transition duration-1000 animate-pulse" />
+            <div className="relative glass card p-4 border-red-500/40 bg-red-950/40 overflow-hidden">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <Flame size={18} className="text-red-500 animate-pulse" fill="currentColor" />
+                  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-red-400">World Boss: {boss.name || 'The Knowledge Monster'}</span>
+                  <div className="group/info relative cursor-help">
+                    <Info size={12} className="text-gray-500 hover:text-white transition-colors" />
+                    <div className="absolute left-0 top-6 w-48 p-2 bg-black/90 backdrop-blur-xl border border-white/10 rounded-xl text-[9px] text-gray-300 font-bold leading-relaxed opacity-0 group-hover/info:opacity-100 transition-opacity z-[60] pointer-events-none shadow-2xl">
+                      🔥 Answer questions correctly in <span className="text-yellow-400">Quests</span> or solve <span className="text-blue-400">Puzzles</span> to deal damage and defeat the boss together!
+                    </div>
+                  </div>
+                </div>
+                <span className="text-[10px] font-black text-white tabular-nums">{boss.hp.toLocaleString()} / {boss.maxHp.toLocaleString()} HP</span>
+              </div>
+              <div className="w-full bg-black/60 h-2.5 rounded-full overflow-hidden border border-white/5 p-0.5">
+                <motion.div 
+                  className="h-full rounded-full bg-gradient-to-r from-red-600 via-orange-500 to-red-600 bg-[length:200%_100%] shadow-[0_0_15px_rgba(239,68,68,0.4)]" 
+                  animate={{ width: `${(boss.hp / boss.maxHp) * 100}%` }} 
+                  transition={{ duration: 1.5, type: 'spring' }} 
+                />
+              </div>
+              <p className="text-[8px] text-center font-black uppercase tracking-widest text-gray-500 mt-2 animate-pulse">Defeat the boss for massive XP rewards!</p>
+            </div>
+          </motion.div>
+        )}
+
+        {boss && boss.hp <= 0 && (
+          <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="mb-6 glass card p-4 border-green-500/30 bg-green-500/10 text-center">
+            <p className="text-xs font-black text-green-400 uppercase tracking-[0.2em]">🎉 Victory! The Boss has been defeated! 🎉</p>
+            <p className="text-[10px] text-gray-400 font-bold uppercase mt-1">New monster spawning soon...</p>
+          </motion.div>
+        )}
 
         <div className="grid grid-cols-3 gap-2 sm:gap-4 mb-6">
           <button onClick={claimQuestReward} disabled={userProfile.dailyQuizzesCount < 3 || userProfile.dailyQuestClaimed} className={`glass card p-3 flex flex-col items-center justify-center border-l-4 transition-all active:scale-95 ${userProfile.dailyQuestClaimed ? 'border-green-500 bg-green-500/5' : (userProfile.dailyQuizzesCount >= 3 ? 'border-yellow-500 bg-yellow-500/10 animate-pulse' : 'border-orange-500 bg-white/5')}`}>
@@ -257,7 +360,10 @@ export default function Dashboard() {
               <motion.button initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} onClick={isIOS ? () => setShowIOSGuide(true) : handleInstall} className="bg-gradient-to-r from-yellow-400 to-orange-500 text-gray-950 px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-2 shadow-xl shadow-orange-500/20 hover:scale-105 transition-transform"><Download size={16} strokeWidth={3} />{isIOS ? 'Install on iPhone / iPad' : 'Install BrainQuest App'}</motion.button>
             )}
           </AnimatePresence>
-          <button onClick={() => setShowAbout(true)} className="flex items-center gap-2 text-gray-600 hover:text-gray-400 transition-colors text-[10px] font-black uppercase tracking-[0.2em]"><Info size={14} /> About BrainQuest</button>
+          <div className="flex items-center gap-6">
+            <button onClick={() => navigate('/progress')} className="flex items-center gap-2 text-green-500 hover:text-green-400 transition-colors text-[10px] font-black uppercase tracking-[0.2em]"><Star size={14} /> Parent Corner</button>
+            <button onClick={() => setShowAbout(true)} className="flex items-center gap-2 text-gray-600 hover:text-gray-400 transition-colors text-[10px] font-black uppercase tracking-[0.2em]"><Info size={14} /> About BrainQuest</button>
+          </div>
         </div>
       </div>
 

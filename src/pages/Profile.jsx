@@ -14,8 +14,8 @@ import {
 import { db } from '../firebase/config'
 import { useAuth } from '../contexts/AuthContext'
 import { AVATARS, CATEGORIES, calcLevel, xpToNextLevel } from '../data/questions'
-import { PREMIUM_AVATARS } from '../data/shop'
-import { ArrowLeft, Star, Zap, BookOpen, Trophy, Award, Check, X, ShoppingBag } from 'lucide-react'
+import { PREMIUM_AVATARS, MYSTERY_PETS } from '../data/shop'
+import { ArrowLeft, Star, Zap, BookOpen, Trophy, Award, Check, X, ShoppingBag, Users, Heart } from 'lucide-react'
 import BadgeGrid from '../components/profile/BadgeGrid'
 import { useSound } from '../hooks/useSound'
 
@@ -74,7 +74,9 @@ export default function Profile() {
   // Resolve avatar: could be index (0-11) or string ID ('av_12'...)
   const avatar = typeof userProfile?.avatarIndex === 'number' 
     ? AVATARS[userProfile.avatarIndex] 
-    : (PREMIUM_AVATARS.find(a => a.id === userProfile?.avatarIndex)?.emoji || AVATARS[0])
+    : (PREMIUM_AVATARS.find(a => a.id === userProfile?.avatarIndex)?.emoji || 
+       MYSTERY_PETS.find(p => p.id === userProfile?.avatarIndex)?.emoji ||
+       AVATARS[0])
 
   const unlockedIds = userProfile?.unlockedAvatars ?? []
 
@@ -227,20 +229,37 @@ export default function Profile() {
                 </div>
 
                 {unlockedIds.length > 0 && (
-                  <div>
-                    <p className="text-xs font-bold text-yellow-500 uppercase tracking-widest mb-3">Premium Unlocked</p>
-                    <div className="grid grid-cols-4 gap-3">
-                      {PREMIUM_AVATARS.filter(a => unlockedIds.includes(a.id)).map((av) => (
-                        <button
-                          key={av.id}
-                          onClick={() => changeAvatar(av.id)}
-                          className={`text-4xl p-3 rounded-2xl border-2 transition-all ${userProfile.avatarIndex === av.id ? 'border-yellow-500 bg-yellow-500/20' : 'border-white/5 hover:bg-white/5'}`}
-                        >
-                          {av.emoji}
-                        </button>
-                      ))}
+                  <>
+                    <div>
+                      <p className="text-xs font-bold text-yellow-500 uppercase tracking-widest mb-3">Premium Shop</p>
+                      <div className="grid grid-cols-4 gap-3">
+                        {PREMIUM_AVATARS.filter(a => unlockedIds.includes(a.id)).map((av) => (
+                          <button
+                            key={av.id}
+                            onClick={() => changeAvatar(av.id)}
+                            className={`text-4xl p-3 rounded-2xl border-2 transition-all ${userProfile.avatarIndex === av.id ? 'border-yellow-500 bg-yellow-500/20' : 'border-white/5 hover:bg-white/5'}`}
+                          >
+                            {av.emoji}
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                  </div>
+
+                    <div>
+                      <p className="text-xs font-bold text-pink-500 uppercase tracking-widest mb-3">My Pets (From Eggs)</p>
+                      <div className="grid grid-cols-4 gap-3">
+                        {MYSTERY_PETS.filter(p => unlockedIds.includes(p.id)).map((pet) => (
+                          <button
+                            key={pet.id}
+                            onClick={() => changeAvatar(pet.id)}
+                            className={`text-4xl p-3 rounded-2xl border-2 transition-all ${userProfile.avatarIndex === pet.id ? 'border-pink-500 bg-pink-500/20' : 'border-white/5 hover:bg-white/5'}`}
+                          >
+                            {pet.emoji}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </>
                 )}
                 
                 <button 

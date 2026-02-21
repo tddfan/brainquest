@@ -70,7 +70,7 @@ const LANDMARK_POOL = [
   { name: 'Venice Canals', id: '1514890547313-92650ec7724c', fact: 'Waterways of Venice, Italy.' },
   { name: 'Sagrada Familia', id: '1580674285041-df11dc53c92b', fact: 'Gaudi masterpiece in Barcelona.' },
   { name: 'Angkor Wat', id: '1544011049040-147da9a4457e', fact: 'Massive temple in Cambodia.' },
-  { name: 'Great Sphinx', id: '1502977249408-da75bdcb6059', fact: 'Limestone statue in Egypt.' },
+  { name: 'Great Sphinx', id: '1502977249408-da75bdcb6059', fact: 'Ancient Egyptian limestone statue.' },
   { name: 'Buckingham Palace', id: '1513635269971-896ad718abc9', fact: 'UK Royal residence.' },
   { name: 'Notre Dame', id: '1473286814282-e3d1c9232ec6', fact: 'Medieval Gothic cathedral, Paris.' },
   { name: 'Arc de Triomphe', id: '1503917988258-f87a78e3c995', fact: 'Iconic victory arch in Paris.' },
@@ -97,7 +97,7 @@ const LANDMARK_POOL = [
 const CAR_LOGO_POOL = [
   { name: 'Tesla', id: 'tesla', fact: 'Pioneers of mass-market EVs.' },
   { name: 'BMW', id: 'bmw', fact: 'Short for Bavarian Motor Works.' },
-  { name: 'Mercedes-Benz', id: 'mercedesbenz', fact: 'Invention of the modern car.' },
+  { name: 'Mercedes-Benz', id: 'mercedes', fact: 'Invention of the modern car.' },
   { name: 'Audi', id: 'audi', fact: 'Symbol represents 4 merged companies.' },
   { name: 'Ferrari', id: 'ferrari', fact: 'Prancing Horse emblem.' },
   { name: 'Porsche', id: 'porsche', fact: 'Iconic 911 manufacturers.' },
@@ -127,7 +127,7 @@ const CAR_LOGO_POOL = [
   { name: 'Bugatti', id: 'bugatti', fact: 'French hypercar maker.' },
   { name: 'McLaren', id: 'mclaren', fact: 'F1 technology for the road.' },
   { name: 'Lotus', id: 'lotus', fact: 'Focused on lightness.' },
-  { name: 'Alfa Romeo', id: 'alfaromeo', fact: 'Italian racing heritage.' },
+  { name: 'Alfa Romeo', id: 'alfa-romeo', fact: 'Italian racing heritage.' },
   { name: 'Fiat', id: 'fiat', fact: 'Italian urban icon.' },
   { name: 'Mini', id: 'mini', fact: 'British design classic.' },
   { name: 'Suzuki', id: 'suzuki', fact: 'Small car specialists.' },
@@ -184,7 +184,6 @@ const BRAND_POOL = [
   { name: 'Figma', id: 'figma', fact: 'Designer tool.' },
   { name: 'Canva', id: 'canva', fact: 'Creative tool.' },
   { name: 'Dropbox', id: 'dropbox', fact: 'Open box.' },
-  { name: 'Slack', id: 'slack', fact: 'Communication hub.' },
   { name: 'Twitch', id: 'twitch', fact: 'Purple glitch.' },
   { name: 'Reddit', id: 'reddit', fact: 'Alien mascot.' },
   { name: 'Tinder', id: 'tinder', fact: 'Flame icon.' },
@@ -206,6 +205,11 @@ const RETRO_POOL = [
   { name: 'Nintendo NES', id: '1550745165-9bc0b252726f', fact: '8-bit legend' },
   { name: 'Tamagotchi', id: '1531525645387-7f14be1bdbbd', fact: 'Digital pet' },
   { name: 'Pagers', id: '1520923642038-b4259ace9451', fact: 'Beeper era' },
+  { name: 'Etch A Sketch', id: '1534430480838-fe7d7916c361', fact: 'Classic red drawing toy.' },
+  { name: 'Rubik\'s Cube', id: '1534430480838-fe7d7916c361', fact: '1980s puzzle craze.' },
+  { name: 'View-Master', id: '1534430480838-fe7d7916c361', fact: '3D stereoscopic images.' },
+  { name: 'Atari 2600', id: '1534430480838-fe7d7916c361', fact: 'Early home video game console.' },
+  { name: 'Slinky', id: '1534430480838-fe7d7916c361', fact: 'Helical spring toy.' },
 ];
 
 const EMOJI_DATA = [
@@ -219,6 +223,8 @@ const EMOJI_DATA = [
   ['🍕🐢', 'Ninja Turtles'], ['🍩🍩', 'The Simpsons'], ['🕵️‍♂️🔎', 'Sherlock Holmes'], ['🧟‍♂️🧟', 'Walking Dead'],
   ['🐉⚔️', 'Game of Thrones'], ['🧙‍♂️🪄', 'Gandalf'], ['🤠🌵', 'Toy Story'], ['👨‍🚀🚀', 'Interstellar'],
   ['🧠🌌', 'Mind-bending'], ['🧸🛌', 'Ted'], ['👻🏠', 'Haunted Mansion'], ['👨‍💻⌨️', 'The Social Network'],
+  ['🐝🎬', 'Bee Movie'], ['🤡🎪', 'Joker'], ['🐺🌕', 'Twilight'], ['🧛‍♂️🩸', 'Dracula'],
+  ['🚂🏫', 'Harry Potter'], ['🔨🛡️', 'Avengers'], ['🏹🍎', 'Robin Hood'], ['👟👠', 'Cinderella'],
 ];
 
 const SUPERHERO_DATA = [

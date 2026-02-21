@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { doc, updateDoc, increment, addDoc, collection, serverTimestamp } from 'firebase/firestore'
+import { doc, updateDoc, increment, addDoc, collection, serverTimestamp, getDoc } from 'firebase/firestore'
 import { db } from '../firebase/config'
 import { useAuth } from '../contexts/AuthContext'
 import confetti from 'canvas-confetti'
@@ -16,8 +16,9 @@ import {
   XP_SPEED_BONUS,
   XP_STREAK_BONUS,
   calcLevel,
+  AVATARS
 } from '../data/questions'
-import { ArrowLeft, Zap, Flame, Clock } from 'lucide-react'
+import { ArrowLeft, Zap, Flame, Clock, Share2, Swords, Check } from 'lucide-react'
 
 import { saveMistake } from '../firebase/mistakes'
 
@@ -100,7 +101,11 @@ export default function QuizPage() {
     const isCorrect = optionIndex === q.correct
     setSelected(optionIndex)
 
-    if (isCorrect) playSound('correct')
+    if (isCorrect) {
+      playSound('correct')
+      // Damage Boss
+      updateDoc(doc(db, 'global', 'boss'), { hp: increment(-15) }).catch(() => {})
+    }
     else {
       playSound('wrong')
       // Save to My Mistakes Room
@@ -195,7 +200,7 @@ export default function QuizPage() {
   }
 
   if (phase === 'done') {
-    return <ResultsScreen results={results} sessionXP={sessionXP} category={cat} navigate={navigate} userProfile={userProfile} onPlayAgain={handlePlayAgain} />
+    return <ResultsScreen results={results} sessionXP={sessionXP} category={cat} navigate={navigate} userProfile={userProfile} onPlayAgain={handlePlayAgain} questions={questions} />
   }
 
   const q = questions[current]
@@ -415,110 +420,180 @@ export default function QuizPage() {
 }
 
 // ─── Results Screen ───────────────────────────────────────────────────────────
-function ResultsScreen({ results, sessionXP, navigate, userProfile, onPlayAgain }) {
+function ResultsScreen({ results, sessionXP, navigate, userProfile, onPlayAgain, category, questions }) {
+  const [duelLink, setDuelLink] = useState(null)
+  const [creatingDuel, setCreatingDuel] = useState(false)
+  const [friends, setFriends] = useState([])
+  const [sentTo, setSentTo] = useState([])
+  const { playSound } = useSound()
+
   const correct = results.filter((r) => r.correct).length
   const total = results.length
   const pct = Math.round((correct / total) * 100)
+
+  // Calculate Level Up
   const prevXP = (userProfile?.totalXP ?? 0) - sessionXP
   const newXP = userProfile?.totalXP ?? 0
   const prevLevel = calcLevel(prevXP)
   const newLevel = calcLevel(newXP)
   const leveledUp = newLevel > prevLevel
 
+  // Load friends to challenge
+  useEffect(() => {
+    async function loadFriends() {
+      if (!userProfile?.friends?.length) return
+      const friendData = []
+      for (const fuid of userProfile.friends) {
+        const snap = await getDoc(doc(db, 'users', fuid))
+        if (snap.exists()) friendData.push(snap.data())
+      }
+      setFriends(friendData)
+    }
+    loadFriends()
+  }, [userProfile])
+
+  const createDuel = async () => {
+    setCreatingDuel(true)
+    try {
+      const duelData = {
+        creatorUid: userProfile.uid,
+        creatorName: userProfile?.username || 'Explorer',
+        creatorScore: correct,
+        category: category?.id,
+        questions: questions,
+        timestamp: serverTimestamp(),
+      }
+      const docRef = await addDoc(collection(db, 'duels'), duelData)
+      const link = `${window.location.origin}/duel/${docRef.id}`
+      
+      // If mobile supports native sharing, use it!
+      if (navigator.share) {
+        try {
+          await navigator.share({
+            title: 'BrainQuest Duel!',
+            text: `I scored ${correct}/${total} in ${category.label}. Can you beat me?`,
+            url: link,
+          })
+        } catch (err) { console.log("Share cancelled") }
+      } else {
+        setDuelLink(link)
+      }
+      playSound('achievement')
+    } catch (e) {
+      console.error("Error creating duel:", e)
+    }
+    setCreatingDuel(false)
+  }
+
+  const inviteFriend = async (friend) => {
+    if (sentTo.includes(friend.uid)) return
+    try {
+      const duelData = {
+        creatorUid: userProfile.uid,
+        creatorName: userProfile?.username || 'Explorer',
+        creatorScore: correct,
+        category: category?.id,
+        questions: questions,
+        timestamp: serverTimestamp(),
+      }
+      const docRef = await addDoc(collection(db, 'duels'), duelData)
+      
+      await addDoc(collection(db, 'invites'), {
+        fromName: userProfile.username,
+        fromUid: userProfile.uid,
+        toUid: friend.uid,
+        duelId: docRef.id,
+        categoryEmoji: category.emoji,
+        categoryLabel: category.label,
+        status: 'pending',
+        timestamp: serverTimestamp()
+      })
+      
+      setSentTo(prev => [...prev, friend.uid])
+      playSound('claim')
+    } catch (e) { console.error(e) }
+  }
+
+  const copyLink = () => {
+    navigator.clipboard.writeText(duelLink)
+    alert("Duel link copied to clipboard! Send it to a friend.")
+  }
+
   useEffect(() => {
     if (pct >= 80) {
       const duration = 3 * 1000;
       const animationEnd = Date.now() + duration;
       const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 0 };
-
       const randomInRange = (min, max) => Math.random() * (max - min) + min;
-
       const interval = setInterval(function() {
         const timeLeft = animationEnd - Date.now();
-
-        if (timeLeft <= 0) {
-          return clearInterval(interval);
-        }
-
+        if (timeLeft <= 0) return clearInterval(interval);
         const particleCount = 50 * (timeLeft / duration);
         confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } });
         confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } });
       }, 250);
     } else if (pct >= 50) {
-      confetti({
-        particleCount: 100,
-        spread: 70,
-        origin: { y: 0.6 }
-      });
+      confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
     }
   }, [pct]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-violet-950 to-gray-950 flex items-center justify-center px-4">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.8 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ type: 'spring', bounce: 0.4 }}
-        className="glass card max-w-md w-full text-center py-10"
-      >
-        {/* Level up banner */}
+    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-violet-950 to-gray-950 flex items-center justify-center px-4 py-10">
+      <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ type: 'spring', bounce: 0.4 }} className="glass card max-w-md w-full text-center py-10">
         <AnimatePresence>
           {leveledUp && (
-            <motion.div
-              initial={{ opacity: 0, y: -30 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="mb-4 px-4 py-2 rounded-2xl bg-gradient-to-r from-yellow-500 to-orange-500 text-black font-black text-lg"
-            >
+            <motion.div initial={{ opacity: 0, y: -30 }} animate={{ opacity: 1, y: 0 }} className="mb-4 px-4 py-2 rounded-2xl bg-gradient-to-r from-yellow-500 to-orange-500 text-black font-black text-lg">
               🚀 LEVEL UP! → Level {newLevel}
             </motion.div>
           )}
         </AnimatePresence>
 
-        <div className="text-7xl mb-4">
-          {pct >= 80 ? '🏆' : pct >= 50 ? '⭐' : '📚'}
-        </div>
-        <h2 className="text-3xl font-black mb-1">
-          {pct >= 80 ? 'Brilliant!' : pct >= 50 ? 'Good Work!' : 'Keep Practising!'}
-        </h2>
-        <p className="text-gray-400 mb-6">
-          {correct} / {total} correct &nbsp;·&nbsp; {pct}%
-        </p>
+        <div className="text-7xl mb-4">{pct >= 80 ? '🏆' : pct >= 50 ? '⭐' : '📚'}</div>
+        <h2 className="text-3xl font-black mb-1">{pct >= 80 ? 'Brilliant!' : pct >= 50 ? 'Good Work!' : 'Keep Practising!'}</h2>
+        <p className="text-gray-400 mb-6">{correct} / {total} correct &nbsp;·&nbsp; {pct}%</p>
 
-        {/* XP earned */}
         <div className="glass rounded-2xl py-4 px-6 mb-6 flex items-center justify-center gap-3">
           <Zap size={24} className="text-violet-400" fill="currentColor" />
           <span className="text-3xl font-black text-violet-300">+{sessionXP} XP</span>
         </div>
 
-        {/* Score bar */}
-        <div className="w-full bg-white/10 rounded-full h-3 mb-8">
-          <motion.div
-            className="h-3 rounded-full bg-gradient-to-r from-violet-500 to-pink-500"
-            initial={{ width: 0 }}
-            animate={{ width: `${pct}%` }}
-            transition={{ duration: 1, ease: 'easeOut', delay: 0.3 }}
-          />
+        <div className="w-full bg-white/10 rounded-full h-3 mb-8 px-4">
+          <motion.div className="h-3 rounded-full bg-gradient-to-r from-violet-500 to-pink-500" initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 1, ease: 'easeOut', delay: 0.3 }} />
         </div>
 
-        <div className="flex gap-3 flex-col sm:flex-row">
-          <button
-            onClick={onPlayAgain}
-            className="btn-primary flex-1"
-          >
-            Play Again
-          </button>
-          <button
-            onClick={() => navigate('/')}
-            className="btn-secondary flex-1"
-          >
-            Dashboard
-          </button>
-          <button
-            onClick={() => navigate('/leaderboard')}
-            className="btn-secondary flex-1"
-          >
-            Leaderboard
-          </button>
+        <div className="flex flex-col gap-3 mt-4 px-6">
+          {!duelLink ? (
+            <button onClick={createDuel} disabled={creatingDuel} className="w-full py-4 bg-blue-600 hover:bg-blue-500 rounded-2xl font-black text-lg flex items-center justify-center gap-3 transition-all active:scale-95 shadow-lg shadow-blue-500/20">
+              <Swords size={20} />
+              {creatingDuel ? 'Preparing Duel...' : 'CHALLENGE A FRIEND'}
+            </button>
+          ) : (
+            <button onClick={copyLink} className="w-full py-4 bg-green-600 hover:bg-green-500 rounded-2xl font-black text-lg flex items-center justify-center gap-3 transition-all active:scale-95 shadow-lg shadow-green-500/20">
+              <Share2 size={20} />
+              COPY DUEL LINK
+            </button>
+          )}
+
+          {friends.length > 0 && (
+            <div className="mt-4 bg-white/5 p-4 rounded-3xl border border-white/5">
+              <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-3">Send to Friend</p>
+              <div className="flex gap-3 overflow-x-auto pb-2 custom-scrollbar">
+                {friends.map(f => (
+                  <button key={f.uid} onClick={() => inviteFriend(f)} disabled={sentTo.includes(f.uid)} className="flex flex-col items-center gap-1 flex-shrink-0 group">
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center text-2xl border-2 transition-all ${sentTo.includes(f.uid) ? 'border-green-500 bg-green-500/20' : 'border-white/10 bg-white/5 group-hover:border-blue-500'}`}>
+                      {sentTo.includes(f.uid) ? <Check size={20} className="text-green-400" /> : AVATARS[f.avatarIndex ?? 0]}
+                    </div>
+                    <span className="text-[10px] font-bold text-gray-400 truncate w-12">{f.username}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="flex gap-3 mt-4">
+            <button onClick={onPlayAgain} className="btn-primary flex-1">Play Again</button>
+            <button onClick={() => navigate('/')} className="btn-secondary flex-1">Home</button>
+          </div>
         </div>
       </motion.div>
     </div>

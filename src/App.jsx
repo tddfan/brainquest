@@ -14,6 +14,9 @@ import HangmanPage from './pages/HangmanPage'
 import ChessPage from './pages/ChessPage'
 import Millionaire from './pages/Millionaire'
 import DailyFun from './pages/DailyFun'
+import SocialPage from './pages/SocialPage'
+import DuelPage from './pages/DuelPage'
+import ProgressReport from './pages/ProgressReport'
 import Shop from './pages/Shop'
 import MistakesRoom from './pages/MistakesRoom'
 import MathsQuest from './pages/MathsQuest'
@@ -35,6 +38,22 @@ export default function App() {
             element={
               <ProtectedRoute allowGuest={true}>
                 <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/social"
+            element={
+              <ProtectedRoute>
+                <SocialPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/duel/:duelId"
+            element={
+              <ProtectedRoute allowGuest={true}>
+                <DuelPage />
               </ProtectedRoute>
             }
           />
@@ -117,6 +136,14 @@ export default function App() {
             element={
               <ProtectedRoute allowGuest={true}>
                 <DailyFun />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/progress"
+            element={
+              <ProtectedRoute>
+                <ProgressReport />
               </ProtectedRoute>
             }
           />
