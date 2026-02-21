@@ -12,7 +12,7 @@ export default function Register() {
   const [avatarIndex, setAvatarIndex] = useState(0)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const { register } = useAuth()
+  const { register, continueAsGuest } = useAuth()
   const navigate = useNavigate()
 
   async function handleSubmit(e) {
@@ -45,6 +45,11 @@ export default function Register() {
       }
     }
     setLoading(false)
+  }
+
+  const handleGuest = () => {
+    continueAsGuest()
+    navigate('/')
   }
 
   return (
@@ -145,6 +150,19 @@ export default function Register() {
             className="btn-primary w-full text-center py-4 text-lg mt-2"
           >
             {loading ? '⏳ Creating account…' : 'Start Exploring! 🚀'}
+          </button>
+
+          <div className="relative my-6">
+            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/10"></div></div>
+            <div className="relative flex justify-center text-xs uppercase"><span className="bg-[#1a1635] px-2 text-gray-500 font-bold">Or</span></div>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleGuest}
+            className="w-full bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold py-4 rounded-2xl transition-all"
+          >
+            Continue as Guest
           </button>
         </form>
 

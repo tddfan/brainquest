@@ -2,118 +2,128 @@ import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { PREMIUM_AVATARS } from '../data/shop'
-import { ArrowLeft, Zap, Check, Lock, ShoppingBag } from 'lucide-react'
-import { doc, updateDoc, increment, arrayUnion } from 'firebase/firestore'
+import { PREMIUM_AVATARS, SHOP_CATEGORIES, SHOP_THEMES } from '../data/shop'
+import { ArrowLeft, Zap, ShoppingBag, Check, Lock, Star, Palette } from 'lucide-react'
+import { doc, updateDoc, arrayUnion, increment } from 'firebase/firestore'
 import { db } from '../firebase/config'
-import confetti from 'canvas-confetti'
 import { useSound } from '../hooks/useSound'
+import confetti from 'canvas-confetti'
 
 export default function Shop() {
   const navigate = useNavigate()
   const { currentUser, userProfile, setUserProfile } = useAuth()
   const { playSound } = useSound()
-  const [buying, setBuying] = useState(null)
+  const [activeCat, setActiveCat] = useState('avatars')
 
   const xp = userProfile?.totalXP ?? 0
-  const unlocked = userProfile?.unlockedAvatars ?? []
+  const unlockedAvatars = userProfile?.unlockedAvatars ?? []
+  const unlockedThemes = userProfile?.unlockedThemes ?? []
 
-  const buyAvatar = async (avatar) => {
-    if (xp < avatar.cost || buying) return
-    setBuying(avatar.id)
+  const buyAvatar = async (item) => {
+    if (xp < item.price) { playSound('wrong'); return }
+    if (unlockedAvatars.includes(item.id)) return
+
     try {
       const userRef = doc(db, 'users', currentUser.uid)
       await updateDoc(userRef, {
-        totalXP: increment(-avatar.cost),
-        unlockedAvatars: arrayUnion(avatar.id)
+        totalXP: increment(-item.price),
+        unlockedAvatars: arrayUnion(item.id)
       })
-      
       setUserProfile(prev => ({
         ...prev,
-        totalXP: prev.totalXP - avatar.cost,
-        unlockedAvatars: [...(prev.unlockedAvatars ?? []), avatar.id]
+        totalXP: prev.totalXP - item.price,
+        unlockedAvatars: [...prev.unlockedAvatars, item.id]
       }))
-
-      playSound('achievement')
-      confetti({
-        particleCount: 150,
-        spread: 70,
-        origin: { y: 0.6 },
-        colors: ['#fbbf24', '#f59e0b', '#fb7185']
-      })
+      playSound('claim')
+      confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } })
     } catch (e) {
-      console.error("Buy error:", e)
+      console.error(e)
     }
-    setBuying(null)
   }
 
   return (
     <div className="min-h-screen bg-gray-950 text-white px-4 py-8">
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-3xl mx-auto">
+        
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
-          <button onClick={() => navigate('/')} className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors">
-            <ArrowLeft size={20} />
-            <span className="font-bold text-sm">Dashboard</span>
+          <button onClick={() => navigate('/')} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+            <ArrowLeft size={24} />
           </button>
-          
-          <div className="flex items-center gap-2 bg-violet-500/20 px-4 py-2 rounded-2xl border border-violet-500/30">
-            <Zap size={18} className="text-violet-400" fill="currentColor" />
-            <span className="text-xl font-black text-violet-300">{xp.toLocaleString()}</span>
+          <div className="flex items-center gap-3 bg-violet-600/20 px-6 py-2.5 rounded-2xl border border-violet-500/30">
+            <Zap size={20} className="text-yellow-400" fill="currentColor" />
+            <span className="font-black text-xl">{xp.toLocaleString()}</span>
+            <span className="text-xs font-bold text-violet-400 uppercase tracking-widest">Available XP</span>
           </div>
         </div>
 
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-black mb-2 bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent flex items-center justify-center gap-3">
-            <ShoppingBag size={32} className="text-orange-500" />
-            Avatar Shop
-          </h1>
-          <p className="text-gray-400">Unlock legendary emojis with your hard-earned XP!</p>
+        <div className="text-center mb-10">
+          <h1 className="text-5xl font-black mb-2 bg-gradient-to-r from-orange-400 to-yellow-400 bg-clip-text text-transparent uppercase tracking-tighter">Quest Shop</h1>
+          <p className="text-gray-400 font-bold uppercase text-xs tracking-widest">Spend your hard-earned XP on epic rewards</p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-          {PREMIUM_AVATARS.map((av) => {
-            const isUnlocked = unlocked.includes(av.id)
-            const canAfford = xp >= av.cost
+        {/* Categories */}
+        <div className="flex gap-2 mb-10 bg-white/5 p-1.5 rounded-3xl border border-white/10">
+          {SHOP_CATEGORIES.map(cat => (
+            <button
+              key={cat.id}
+              onClick={() => setActiveCat(cat.id)}
+              className={`flex-1 py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${activeCat === cat.id ? 'bg-orange-500 text-gray-950 shadow-xl shadow-orange-500/20' : 'text-gray-500 hover:text-gray-300'}`}
+            >
+              <span>{cat.emoji}</span>
+              <span className="hidden sm:inline">{cat.label}</span>
+            </button>
+          ))}
+        </div>
 
-            return (
-              <motion.div
-                key={av.id}
-                whileHover={{ y: -5 }}
-                className={`glass card p-6 text-center relative overflow-hidden border-2 ${isUnlocked ? 'border-green-500/30' : 'border-white/5'}`}
-              >
-                <div className="text-7xl mb-4 drop-shadow-2xl">{av.emoji}</div>
-                <h3 className="text-xl font-black mb-1">{av.name}</h3>
-                
-                {isUnlocked ? (
-                  <div className="mt-4 flex items-center justify-center gap-2 text-green-400 font-bold uppercase tracking-widest text-xs bg-green-400/10 py-2 rounded-xl">
-                    <Check size={14} /> Unlocked
-                  </div>
-                ) : (
-                  <button
-                    disabled={!canAfford || buying === av.id}
-                    onClick={() => buyAvatar(av)}
-                    className={`mt-4 w-full py-3 rounded-xl font-black flex items-center justify-center gap-2 transition-all ${
-                      canAfford 
-                        ? 'bg-gradient-to-r from-violet-600 to-blue-600 hover:scale-105 active:scale-95 shadow-lg shadow-blue-600/20' 
-                        : 'bg-white/5 text-gray-500 cursor-not-allowed'
-                    }`}
-                  >
-                    {buying === av.id ? (
-                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+        {/* Content */}
+        <AnimatePresence mode="wait">
+          {activeCat === 'avatars' && (
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} key="avatars" className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+              {PREMIUM_AVATARS.map(item => {
+                const isOwned = unlockedAvatars.includes(item.id)
+                const canAfford = xp >= item.price
+                return (
+                  <div key={item.id} className={`glass card p-6 text-center border-2 transition-all ${isOwned ? 'border-green-500/30' : 'border-white/5'}`}>
+                    <div className="text-6xl mb-4 filter drop-shadow-lg">{item.emoji}</div>
+                    <h4 className="font-black text-sm mb-1">{item.name}</h4>
+                    
+                    {isOwned ? (
+                      <div className="mt-4 py-2 bg-green-500/20 text-green-400 rounded-xl font-black text-xs flex items-center justify-center gap-1">
+                        <Check size={14} /> OWNED
+                      </div>
                     ) : (
-                      <>
-                        {!canAfford && <Lock size={14} />}
-                        <Zap size={14} fill="currentColor" />
-                        {av.cost.toLocaleString()} XP
-                      </>
+                      <button
+                        onClick={() => buyAvatar(item)}
+                        disabled={!canAfford}
+                        className={`mt-4 w-full py-3 rounded-xl font-black text-xs flex items-center justify-center gap-2 transition-all ${canAfford ? 'bg-white text-gray-950 hover:scale-105' : 'bg-white/5 text-gray-600 cursor-not-allowed'}`}
+                      >
+                        <Zap size={12} fill="currentColor" /> {item.price}
+                      </button>
                     )}
-                  </button>
-                )}
-              </motion.div>
-            )
-          })}
-        </div>
+                  </div>
+                )
+              })}
+            </motion.div>
+          )}
+
+          {activeCat === 'themes' && (
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} key="themes" className="text-center py-20 bg-white/5 rounded-3xl border-2 border-dashed border-white/5">
+              <Palette size={48} className="mx-auto mb-4 text-gray-600" />
+              <p className="font-black text-gray-500 uppercase tracking-widest">Coming in the next update!</p>
+              <p className="text-xs text-gray-700 mt-2">Custom profile backgrounds and color schemes.</p>
+            </motion.div>
+          )}
+
+          {activeCat === 'badges' && (
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} key="badges" className="text-center py-20 bg-white/5 rounded-3xl border-2 border-dashed border-white/5">
+              <Star size={48} className="mx-auto mb-4 text-gray-600" />
+              <p className="font-black text-gray-500 uppercase tracking-widest">Rare Badges coming soon!</p>
+              <p className="text-xs text-gray-700 mt-2">Purchase limited edition badges for your profile.</p>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
       </div>
     </div>
   )

@@ -24,8 +24,15 @@ const QUESTION_TIME = 20 // seconds per question
 export default function QuizPage() {
   const { category } = useParams()
   const navigate = useNavigate()
-  const { currentUser, userProfile, setUserProfile } = useAuth()
+  const { currentUser, userProfile, setUserProfile, isGuest } = useAuth()
   const { playSound } = useSound()
+
+  // Guest restriction: only allow 'flags'
+  useEffect(() => {
+    if (isGuest && category !== 'flags') {
+      navigate('/')
+    }
+  }, [isGuest, category, navigate])
 
   const [questions, setQuestions] = useState([])
   const [loading, setLoading] = useState(true)
@@ -113,25 +120,29 @@ export default function QuizPage() {
   async function nextQuestion() {
     const isLast = current === questions.length - 1
     if (isLast) {
-      // Persist XP to Firestore
       const totalCorrect = results.filter((r) => r.correct).length + (selected === questions[current].correct ? 1 : 0)
+      
       try {
-        await updateDoc(doc(db, 'users', currentUser.uid), {
-          totalXP: increment(sessionXP),
-          quizzesCompleted: increment(1),
-          dailyQuizzesCount: increment(1),
-        })
-        // Log quiz history
-        await addDoc(collection(db, 'quizHistory'), {
-          uid: currentUser.uid,
-          username: userProfile?.username,
-          category,
-          score: totalCorrect,
-          total: questions.length,
-          xpEarned: sessionXP,
-          timestamp: serverTimestamp(),
-        })
-        // Update local profile state
+        if (!isGuest) {
+          // Persist to Firestore only if NOT a guest
+          await updateDoc(doc(db, 'users', currentUser.uid), {
+            totalXP: increment(sessionXP),
+            dailyXP: increment(sessionXP),
+            quizzesCompleted: increment(1),
+            dailyQuizzesCount: increment(1),
+          })
+          await addDoc(collection(db, 'quizHistory'), {
+            uid: currentUser.uid,
+            username: userProfile?.username,
+            category,
+            score: totalCorrect,
+            total: questions.length,
+            xpEarned: sessionXP,
+            timestamp: serverTimestamp(),
+          })
+        }
+        
+        // Update local state for everyone (Guests and Users)
         setUserProfile((prev) => ({
           ...prev,
           totalXP: (prev?.totalXP ?? 0) + sessionXP,
@@ -267,9 +278,22 @@ export default function QuizPage() {
                     style={{ opacity: 0 }}
                     onError={(e) => {
                       const target = e.currentTarget;
-                      if (!target.dataset.triedFinal) {
-                        target.dataset.triedFinal = 'true';
-                        target.src = `https://placehold.co/600x400/1e1b4b/white?text=Image+unavailable`;
+                      const keyword = q.options[q.correct] || 'Landmark';
+                      
+                      if (!target.dataset.triedKeyword) {
+                        target.dataset.triedKeyword = 'true';
+                        // Try a keyword search fallback first
+                        target.src = `https://loremflickr.com/600/400/${encodeURIComponent(keyword.replace(/\s+/g, ','))}`;
+                      } else {
+                        // If that also fails, show a stylized icon
+                        target.style.display = 'none';
+                        const placeholder = document.createElement('div');
+                        placeholder.className = 'absolute inset-0 flex flex-col items-center justify-center bg-gray-900/50';
+                        placeholder.innerHTML = `
+                          <div class="text-5xl mb-2 opacity-20">🖼️</div>
+                          <div class="text-[10px] font-black uppercase tracking-[0.2em] opacity-30 text-white">View not available</div>
+                        `;
+                        target.parentElement.appendChild(placeholder);
                       }
                     }}
                   />

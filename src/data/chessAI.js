@@ -133,7 +133,24 @@ export function getBestMove(chess, difficulty) {
   moves = moves.sort(() => Math.random() - 0.5)
 
   if (difficulty === 'easy') {
-    return moves[Math.floor(Math.random() * moves.length)]
+    // 40% chance to make a completely random move (to keep it 'easy')
+    if (Math.random() < 0.4) {
+      return moves[Math.floor(Math.random() * moves.length)]
+    }
+    // Otherwise, do a simple depth-1 search (prefer captures/good positions)
+    const isMaximizing = chess.turn() === 'w'
+    let bestMove = moves[0]
+    let bestVal = isMaximizing ? -Infinity : Infinity
+    for (const move of moves) {
+      chess.move(move)
+      const val = evaluateBoard(chess, 0)
+      chess.undo()
+      if (isMaximizing ? val > bestVal : val < bestVal) {
+        bestVal = val
+        bestMove = move
+      }
+    }
+    return bestMove
   }
 
   const depth = difficulty === 'hard' ? 3 : 2

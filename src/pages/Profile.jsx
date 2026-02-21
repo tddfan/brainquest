@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
   collection,
   query,
@@ -20,9 +20,16 @@ import BadgeGrid from '../components/profile/BadgeGrid'
 import { useSound } from '../hooks/useSound'
 
 export default function Profile() {
-  const { currentUser, userProfile, setUserProfile } = useAuth()
+  const { currentUser, userProfile, setUserProfile, isGuest } = useAuth()
   const navigate = useNavigate()
   const { playSound } = useSound()
+
+  // Guest restriction
+  useEffect(() => {
+    if (isGuest) {
+      navigate('/')
+    }
+  }, [isGuest, navigate])
   const [history, setHistory] = useState([])
   const [loadingHistory, setLoadingHistory] = useState(true)
   const [showAvatarPicker, setShowAvatarPicker] = useState(false)

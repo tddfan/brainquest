@@ -3,16 +3,17 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { CATEGORIES, AVATARS, calcLevel, xpToNextLevel } from '../data/questions'
-import { Trophy, LogOut, Star, Info, X, Zap, Gift, Target, Award, ShoppingBag } from 'lucide-react'
+import { Trophy, LogOut, Star, Info, X, Zap, Gift, Target, Award, ShoppingBag, Lock } from 'lucide-react'
 import confetti from 'canvas-confetti'
 import { doc, updateDoc, increment } from 'firebase/firestore'
 import { db } from '../firebase/config'
 import { useSound } from '../hooks/useSound'
 
 const SECTIONS = [
-  { id: 'quizzes', label: 'Quizzes', emoji: '🎯' },
-  { id: 'puzzles', label: 'Puzzles', emoji: '🧩' },
-  { id: 'fun', label: 'Daily Fun', emoji: '✨' },
+  { id: 'learn',   label: 'Learn',    emoji: '📚' },
+  { id: 'fun',     label: 'Daily Fun', emoji: '✨' },
+  { id: 'quizzes', label: 'Quizzes',  emoji: '🎯' },
+  { id: 'puzzles', label: 'Puzzles',  emoji: '🧩' },
 ]
 
 const PUZZLE_TILES = [
@@ -71,6 +72,39 @@ const PUZZLE_TILES = [
     xpNote: 'Up to 200 XP',
     path: '/puzzle/hangman',
   },
+  {
+    id: 'memory',
+    label: 'Memory Game',
+    emoji: '🃏',
+    description: 'Flip cards and match the pairs',
+    gradient: 'from-purple-600 to-pink-500',
+    xpNote: 'Up to 400 XP',
+    path: '/puzzle/memory',
+    isNew: true,
+  },
+]
+
+const LEARN_TILES = [
+  {
+    id: 'maths',
+    label: 'Maths Quest',
+    emoji: '🔢',
+    description: '60-second maths sprint — Age based',
+    gradient: 'from-yellow-500 to-orange-500',
+    xpNote: 'Up to 50 XP/question',
+    path: '/maths-quest',
+    isNew: true,
+  },
+  {
+    id: 'english',
+    label: 'English Quest',
+    emoji: '📖',
+    description: 'Vocabulary & grammar for all ages',
+    gradient: 'from-blue-500 to-cyan-500',
+    xpNote: '50 XP per correct',
+    path: '/english-quest',
+    isNew: true,
+  },
 ]
 
 const DAILY_TILES = [
@@ -98,6 +132,15 @@ const DAILY_TILES = [
     gradient: 'from-cyan-600 to-blue-500',
     path: '/daily-fun',
   },
+  {
+    id: 'news',
+    label: 'Daily News',
+    emoji: '📰',
+    description: 'Kid-friendly news & Space tech',
+    gradient: 'from-slate-600 to-gray-500',
+    path: '/daily-fun',
+    isNew: true,
+  },
 ]
 
 const cardVariants = {
@@ -114,62 +157,85 @@ export default function Dashboard() {
   const navigate = useNavigate()
   const { playSound } = useSound()
   const [showAbout, setShowAbout] = useState(false)
-  const [section, setSection] = useState('quizzes')
+  const [section, setSection] = useState('learn')
   const [showDailyBonus, setShowDailyBonus] = useState(false)
 
-  const xp = userProfile?.totalXP ?? 0
-  const level = calcLevel(xp)
-  const progress = xpToNextLevel(xp)
-  const avatar = AVATARS[userProfile?.avatarIndex ?? 0]
+  // Safe date helper
+  const getDateString = (val) => {
+    if (!val) return "";
+    if (val.toDate) return val.toDate().toDateString(); // Firestore Timestamp
+    if (val instanceof Date) return val.toDateString(); // JS Date
+    return "";
+  };
 
   // Daily Reward & Reset Check
   useEffect(() => {
-    if (!currentUser || !userProfile) return
+    if (!userProfile) return
     
     const today = new Date().toDateString()
-    const lastDailyUpdate = userProfile.lastDailyUpdate?.toDate?.()?.toDateString() || ""
+    const lastUpdateStr = getDateString(userProfile.lastDailyUpdate)
 
-    if (lastDailyUpdate !== today) {
-      // Reset count for a new day
-      const userRef = doc(db, 'users', currentUser.uid)
-      updateDoc(userRef, {
-        dailyQuizzesCount: 0,
-        lastDailyUpdate: new Date(),
-        dailyQuestClaimed: false
-      }).then(() => {
+    if (lastUpdateStr !== today) {
+      if (userProfile.isGuest) {
         setUserProfile(prev => ({ 
           ...prev, 
           dailyQuizzesCount: 0, 
+          dailyXP: 0,
           lastDailyUpdate: new Date(),
           dailyQuestClaimed: false 
         }))
-      })
+        return
+      }
+
+      if (currentUser) {
+        // Reset count for a new day in Firestore
+        const userRef = doc(db, 'users', currentUser.uid)
+        updateDoc(userRef, {
+          dailyQuizzesCount: 0,
+          dailyXP: 0,
+          lastDailyUpdate: new Date(),
+          dailyQuestClaimed: false
+        }).then(() => {
+          setUserProfile(prev => ({ 
+            ...prev, 
+            dailyQuizzesCount: 0, 
+            dailyXP: 0,
+            lastDailyUpdate: new Date(),
+            dailyQuestClaimed: false 
+          }))
+        })
+      }
     }
-  }, [currentUser, userProfile])
+  }, [currentUser, userProfile, setUserProfile])
 
   // Daily Reward Logic (Existing localStorage one)
   useEffect(() => {
-    if (!currentUser) return
-    const lastBonus = localStorage.getItem(`daily_bonus_${currentUser.uid}`)
+    if (!currentUser && !userProfile?.isGuest) return
+    const id = currentUser?.uid || 'guest'
+    const lastBonus = localStorage.getItem(`daily_bonus_${id}`)
     const today = new Date().toDateString()
 
     if (lastBonus !== today) {
-      setShowDailyBonus(today)
+      setShowDailyBonus(true)
     }
-  }, [currentUser])
+  }, [currentUser, userProfile])
 
   const claimQuestReward = async () => {
     if ((userProfile?.dailyQuizzesCount ?? 0) >= 3 && !userProfile?.dailyQuestClaimed) {
       const bonus = 500
       try {
-        const userRef = doc(db, 'users', currentUser.uid)
-        await updateDoc(userRef, {
-          totalXP: increment(bonus),
-          dailyQuestClaimed: true
-        })
+        if (!userProfile.isGuest && currentUser) {
+          const userRef = doc(db, 'users', currentUser.uid)
+          await updateDoc(userRef, {
+            totalXP: increment(bonus),
+            dailyXP: increment(bonus),
+            dailyQuestClaimed: true
+          })
+        }
         setUserProfile(prev => ({ 
           ...prev, 
           totalXP: (prev?.totalXP ?? 0) + bonus,
+          dailyXP: (prev?.dailyXP ?? 0) + bonus,
           dailyQuestClaimed: true 
         }))
         playSound('achievement')
@@ -189,11 +255,14 @@ export default function Dashboard() {
     if (!showDailyBonus) return
     const bonusXP = 250
     try {
-      await updateDoc(doc(db, 'users', currentUser.uid), {
-        totalXP: increment(bonusXP),
-      })
-      setUserProfile((prev) => ({ ...prev, totalXP: (prev?.totalXP ?? 0) + bonusXP }))
-      localStorage.setItem(`daily_bonus_${currentUser.uid}`, showDailyBonus)
+      if (!userProfile?.isGuest && currentUser) {
+        await updateDoc(doc(db, 'users', currentUser.uid), {
+          totalXP: increment(bonusXP),
+          dailyXP: increment(bonusXP),
+        })
+      }
+      setUserProfile((prev) => ({ ...prev, totalXP: (prev?.totalXP ?? 0) + bonusXP, dailyXP: (prev?.dailyXP ?? 0) + bonusXP }))
+      localStorage.setItem(`daily_bonus_${currentUser?.uid || 'guest'}`, new Date().toDateString())
       setShowDailyBonus(false)
       
       playSound('claim')
@@ -213,6 +282,19 @@ export default function Dashboard() {
     await logout()
     navigate('/login')
   }
+
+  if (!userProfile) {
+    return (
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-violet-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
+  }
+
+  const xp = userProfile.totalXP ?? 0
+  const level = calcLevel(xp)
+  const progress = xpToNextLevel(xp)
+  const avatar = AVATARS[userProfile.avatarIndex ?? 0] || '🦁'
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-950 via-violet-950 to-gray-950 px-4 py-8 relative">
@@ -244,10 +326,18 @@ export default function Dashboard() {
       <div className="max-w-4xl mx-auto">
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-3">
-            <div className="text-4xl cursor-pointer hover:scale-110 transition-transform" onClick={() => navigate('/profile')}>{avatar}</div>
+            <div 
+              className={`text-4xl cursor-pointer hover:scale-110 transition-transform ${userProfile.isGuest ? 'cursor-default hover:scale-100' : ''}`} 
+              onClick={() => {
+                if (userProfile.isGuest) return;
+                navigate('/profile');
+              }}
+            >
+              {avatar}
+            </div>
             <div>
               <h2 className="text-xl font-extrabold leading-tight">
-                {userProfile?.username ?? 'Explorer'}
+                {userProfile.username ?? 'Explorer'}
               </h2>
               <div className="flex items-center gap-1 text-yellow-400 text-sm font-bold">
                 <Star size={14} fill="currentColor" />
@@ -259,15 +349,21 @@ export default function Dashboard() {
 
           <div className="flex items-center gap-3">
             <button
-              onClick={() => navigate('/shop')}
-              className="flex items-center gap-2 bg-gradient-to-r from-orange-500 to-yellow-500 text-blue-950 text-sm py-2 px-4 rounded-2xl font-black shadow-lg shadow-orange-500/20 hover:scale-105 transition-transform"
+              onClick={() => {
+                if (userProfile.isGuest) { playSound('wrong'); return; }
+                navigate('/shop');
+              }}
+              className={`flex items-center gap-2 bg-gradient-to-r from-orange-500 to-yellow-500 text-blue-950 text-sm py-2 px-4 rounded-2xl font-black shadow-lg shadow-orange-500/20 hover:scale-105 transition-transform ${userProfile.isGuest ? 'grayscale opacity-50' : ''}`}
             >
               <ShoppingBag size={16} />
               Shop
             </button>
             <button
-              onClick={() => navigate('/leaderboard')}
-              className="flex items-center gap-2 btn-secondary text-sm py-2 px-4 shadow-lg shadow-black/20"
+              onClick={() => {
+                if (userProfile.isGuest) { playSound('wrong'); return; }
+                navigate('/leaderboard');
+              }}
+              className={`flex items-center gap-2 btn-secondary text-sm py-2 px-4 shadow-lg shadow-black/20 ${userProfile.isGuest ? 'grayscale opacity-50' : ''}`}
             >
               <Trophy size={16} />
               Leaderboard
@@ -284,50 +380,53 @@ export default function Dashboard() {
 
         {/* Daily Quest Card */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <div className={`md:col-span-2 glass card p-6 border-l-4 ${userProfile?.dailyQuestClaimed ? 'border-green-500' : 'border-orange-500'} flex items-center justify-between group`}>
+          <div className={`md:col-span-2 glass card p-6 border-l-4 ${userProfile.dailyQuestClaimed ? 'border-green-500' : 'border-orange-500'} flex items-center justify-between group`}>
             <div className="flex items-center gap-4">
-              <div className={`p-3 rounded-2xl ${userProfile?.dailyQuestClaimed ? 'bg-green-500/20 text-green-400' : 'bg-orange-500/20 text-orange-400'}`}>
-                {userProfile?.dailyQuestClaimed ? <Award size={24} /> : <Target size={24} />}
+              <div className={`p-3 rounded-2xl ${userProfile.dailyQuestClaimed ? 'bg-green-500/20 text-green-400' : 'bg-orange-500/20 text-orange-400'}`}>
+                {userProfile.dailyQuestClaimed ? <Award size={24} /> : <Target size={24} />}
               </div>
               <div>
-                <p className={`text-xs font-bold uppercase tracking-widest ${userProfile?.dailyQuestClaimed ? 'text-green-500' : 'text-orange-500'}`}>
-                  {userProfile?.dailyQuestClaimed ? 'Quest Completed!' : "Today's Quest"}
+                <p className={`text-xs font-bold uppercase tracking-widest ${userProfile.dailyQuestClaimed ? 'text-green-500' : 'text-orange-500'}`}>
+                  {userProfile.dailyQuestClaimed ? 'Quest Completed!' : "Today's Quest"}
                 </p>
                 <h4 className="text-lg font-black">Complete any 3 Quizzes</h4>
                 <div className="flex gap-1 mt-1">
                   {[1,2,3].map(i => (
-                    <div key={i} className={`h-1.5 w-8 rounded-full ${i <= (userProfile?.dailyQuizzesCount ?? 0) ? (userProfile?.dailyQuestClaimed ? 'bg-green-500' : 'bg-orange-500') : 'bg-white/10'}`}></div>
+                    <div key={i} className={`h-1.5 w-8 rounded-full ${i <= (userProfile.dailyQuizzesCount ?? 0) ? (userProfile.dailyQuestClaimed ? 'bg-green-500' : 'bg-orange-500') : 'bg-white/10'}`}></div>
                   ))}
                 </div>
               </div>
             </div>
             
-            {userProfile?.dailyQuizzesCount >= 3 && !userProfile?.dailyQuestClaimed ? (
+            {userProfile.dailyQuizzesCount >= 3 && !userProfile.dailyQuestClaimed ? (
               <button 
                 onClick={claimQuestReward}
                 className="bg-gradient-to-r from-orange-500 to-yellow-500 text-blue-950 font-black py-2 px-4 rounded-xl text-sm animate-pulse hover:scale-105 transition-transform"
               >
                 CLAIM +500 XP
               </button>
-            ) : userProfile?.dailyQuestClaimed ? (
+            ) : userProfile.dailyQuestClaimed ? (
               <div className="text-green-400 font-bold text-sm flex items-center gap-1">
                 <Award size={16} /> Collected
               </div>
             ) : (
               <div className="bg-white/5 p-2 rounded-xl text-gray-500 text-xs font-bold">
-                {userProfile?.dailyQuizzesCount ?? 0}/3
+                {userProfile.dailyQuizzesCount ?? 0}/3
               </div>
             )}
           </div>
 
-          <div className="glass card p-6 border-l-4 border-violet-500 flex items-center gap-4 cursor-pointer hover:bg-white/5 transition-colors" onClick={() => navigate('/profile')}>
+          <div className="glass card p-6 border-l-4 border-violet-500 flex items-center gap-4 cursor-pointer hover:bg-white/5 transition-colors" onClick={() => {
+            if (userProfile.isGuest) { playSound('wrong'); return; }
+            navigate('/profile');
+          }}>
             <div className="bg-violet-500/20 p-3 rounded-2xl text-violet-400">
               <Award size={24} />
             </div>
             <div>
               <p className="text-xs font-bold text-violet-500 uppercase tracking-widest">Collection</p>
               <h4 className="text-lg font-black">Badges</h4>
-              <p className="text-xs text-gray-400">{(userProfile?.achievements?.length ?? 0)} unlocked</p>
+              <p className="text-xs text-gray-400">{(userProfile.achievements?.length ?? 0)} unlocked</p>
             </div>
           </div>
         </div>
@@ -397,28 +496,46 @@ export default function Dashboard() {
               transition={{ duration: 0.2 }}
             >
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                {Object.values(CATEGORIES).map((cat, i) => (
-                  <motion.button
-                    key={cat.id}
-                    custom={i}
-                    variants={cardVariants}
-                    initial="hidden"
-                    animate="visible"
-                    whileHover={{ scale: 1.03 }}
-                    whileTap={{ scale: 0.97 }}
-                    onClick={() => { playSound('click'); navigate(`/quiz/${cat.id}`); }}
-                    className={`relative overflow-hidden text-left rounded-3xl p-6 shadow-2xl bg-gradient-to-br ${cat.gradient} group`}
-                  >
-                    <div className="absolute -top-6 -right-6 w-28 h-28 rounded-full bg-white/10 group-hover:scale-125 transition-transform duration-500" />
-                    <div className="text-5xl mb-4">{cat.emoji}</div>
-                    <h3 className="text-2xl font-extrabold mb-1">{cat.label}</h3>
-                    <p className="text-white/70 text-sm">{cat.description}</p>
-                    <div className="mt-4 inline-flex items-center gap-2 bg-white/20 rounded-full px-4 py-1.5 text-sm font-bold">
-                      <Star size={14} fill="white" />
-                      100–150 XP per question
-                    </div>
-                  </motion.button>
-                ))}
+                {Object.values(CATEGORIES).map((cat, i) => {
+                  const locked = userProfile.isGuest && cat.id !== 'flags'
+                  return (
+                    <motion.button
+                      key={cat.id}
+                      custom={i}
+                      variants={cardVariants}
+                      initial="hidden"
+                      animate="visible"
+                      whileHover={locked ? {} : { scale: 1.03 }}
+                      whileTap={locked ? {} : { scale: 0.97 }}
+                      onClick={() => { 
+                        if (locked) {
+                          playSound('wrong')
+                          return
+                        }
+                        playSound('click'); 
+                        navigate(`/quiz/${cat.id}`); 
+                      }}
+                      className={`relative overflow-hidden text-left rounded-3xl p-6 shadow-2xl bg-gradient-to-br ${cat.gradient} group ${locked ? 'grayscale opacity-60 cursor-not-allowed' : ''}`}
+                    >
+                      {locked && (
+                        <div className="absolute inset-0 bg-black/20 flex items-center justify-center z-30">
+                          <div className="bg-black/60 backdrop-blur-md px-4 py-2 rounded-xl border border-white/20 flex items-center gap-2">
+                            <Lock size={16} className="text-white" />
+                            <span className="text-white font-black text-xs">LOCKED</span>
+                          </div>
+                        </div>
+                      )}
+                      <div className="absolute -top-6 -right-6 w-28 h-28 rounded-full bg-white/10 group-hover:scale-125 transition-transform duration-500" />
+                      <div className="text-5xl mb-4">{cat.emoji}</div>
+                      <h3 className="text-2xl font-extrabold mb-1">{cat.label}</h3>
+                      <p className="text-white/70 text-sm">{cat.description}</p>
+                      <div className="mt-4 inline-flex items-center gap-2 bg-white/20 rounded-full px-4 py-1.5 text-sm font-bold">
+                        <Star size={14} fill="white" />
+                        100–150 XP per question
+                      </div>
+                    </motion.button>
+                  )
+                })}
               </div>
             </motion.div>
           ) : section === 'puzzles' ? (
@@ -430,33 +547,104 @@ export default function Dashboard() {
               transition={{ duration: 0.2 }}
             >
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                {PUZZLE_TILES.map((tile, i) => (
-                  <motion.button
-                    key={tile.id}
-                    custom={i}
-                    variants={cardVariants}
-                    initial="hidden"
-                    animate="visible"
-                    whileHover={{ scale: 1.03 }}
-                    whileTap={{ scale: 0.97 }}
-                    onClick={() => { playSound('click'); navigate(tile.path); }}
-                    className={`relative overflow-hidden text-left rounded-3xl p-6 shadow-2xl bg-gradient-to-br ${tile.gradient} group`}
-                  >
-                    {tile.isNew && (
-                      <div className="absolute top-4 right-4 bg-yellow-400 text-blue-900 text-[10px] font-black px-2 py-0.5 rounded-full z-20 animate-bounce">
-                        NEW
+                {PUZZLE_TILES.map((tile, i) => {
+                  const locked = userProfile.isGuest && tile.id !== 'chess'
+                  return (
+                    <motion.button
+                      key={tile.id}
+                      custom={i}
+                      variants={cardVariants}
+                      initial="hidden"
+                      animate="visible"
+                      whileHover={locked ? {} : { scale: 1.03 }}
+                      whileTap={locked ? {} : { scale: 0.97 }}
+                      onClick={() => { 
+                        if (locked) {
+                          playSound('wrong')
+                          return
+                        }
+                        playSound('click'); 
+                        navigate(tile.path); 
+                      }}
+                      className={`relative overflow-hidden text-left rounded-3xl p-6 shadow-2xl bg-gradient-to-br ${tile.gradient} group ${locked ? 'grayscale opacity-60 cursor-not-allowed' : ''}`}
+                    >
+                      {locked && (
+                        <div className="absolute inset-0 bg-black/20 flex items-center justify-center z-30">
+                          <div className="bg-black/60 backdrop-blur-md px-4 py-2 rounded-xl border border-white/20 flex items-center gap-2">
+                            <Lock size={16} className="text-white" />
+                            <span className="text-white font-black text-xs">LOCKED</span>
+                          </div>
+                        </div>
+                      )}
+                      {tile.isNew && !locked && (
+                        <div className="absolute top-4 right-4 bg-yellow-400 text-blue-900 text-[10px] font-black px-2 py-0.5 rounded-full z-20 animate-bounce">
+                          NEW
+                        </div>
+                      )}
+                      <div className="absolute -top-6 -right-6 w-28 h-28 rounded-full bg-white/10 group-hover:scale-125 transition-transform duration-500" />
+                      <div className="text-5xl mb-4">{tile.emoji}</div>
+                      <h3 className="text-2xl font-extrabold mb-1">{tile.label}</h3>
+                      <p className="text-white/70 text-sm">{tile.description}</p>
+                      <div className="mt-4 inline-flex items-center gap-2 bg-white/20 rounded-full px-4 py-1.5 text-sm font-bold">
+                        <Zap size={14} fill="white" />
+                        {tile.xpNote}
                       </div>
-                    )}
-                    <div className="absolute -top-6 -right-6 w-28 h-28 rounded-full bg-white/10 group-hover:scale-125 transition-transform duration-500" />
-                    <div className="text-5xl mb-4">{tile.emoji}</div>
-                    <h3 className="text-2xl font-extrabold mb-1">{tile.label}</h3>
-                    <p className="text-white/70 text-sm">{tile.description}</p>
-                    <div className="mt-4 inline-flex items-center gap-2 bg-white/20 rounded-full px-4 py-1.5 text-sm font-bold">
-                      <Zap size={14} fill="white" />
-                      {tile.xpNote}
-                    </div>
-                  </motion.button>
-                ))}
+                    </motion.button>
+                  )
+                })}
+              </div>
+            </motion.div>
+          ) : section === 'learn' ? (
+            <motion.div
+              key="learn"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2 }}
+            >
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                {LEARN_TILES.map((tile, i) => {
+                  const locked = userProfile.isGuest
+                  return (
+                    <motion.button
+                      key={tile.id}
+                      custom={i}
+                      variants={cardVariants}
+                      initial="hidden"
+                      animate="visible"
+                      whileHover={locked ? {} : { scale: 1.03 }}
+                      whileTap={locked ? {} : { scale: 0.97 }}
+                      onClick={() => {
+                        if (locked) { playSound('wrong'); return }
+                        playSound('click')
+                        navigate(tile.path)
+                      }}
+                      className={`relative overflow-hidden text-left rounded-3xl p-6 shadow-2xl bg-gradient-to-br ${tile.gradient} group ${locked ? 'grayscale opacity-60 cursor-not-allowed' : ''}`}
+                    >
+                      {locked && (
+                        <div className="absolute inset-0 bg-black/20 flex items-center justify-center z-30">
+                          <div className="bg-black/60 backdrop-blur-md px-4 py-2 rounded-xl border border-white/20 flex items-center gap-2">
+                            <Lock size={16} className="text-white" />
+                            <span className="text-white font-black text-xs">LOCKED</span>
+                          </div>
+                        </div>
+                      )}
+                      {tile.isNew && !locked && (
+                        <div className="absolute top-4 right-4 bg-yellow-400 text-blue-900 text-[10px] font-black px-2 py-0.5 rounded-full z-20 animate-bounce">
+                          NEW
+                        </div>
+                      )}
+                      <div className="absolute -top-6 -right-6 w-28 h-28 rounded-full bg-white/10 group-hover:scale-125 transition-transform duration-500" />
+                      <div className="text-5xl mb-4">{tile.emoji}</div>
+                      <h3 className="text-2xl font-extrabold mb-1">{tile.label}</h3>
+                      <p className="text-white/70 text-sm">{tile.description}</p>
+                      <div className="mt-4 inline-flex items-center gap-2 bg-white/20 rounded-full px-4 py-1.5 text-sm font-bold">
+                        <Zap size={14} fill="white" />
+                        {tile.xpNote}
+                      </div>
+                    </motion.button>
+                  )
+                })}
               </div>
             </motion.div>
           ) : (
@@ -468,24 +656,47 @@ export default function Dashboard() {
               transition={{ duration: 0.2 }}
             >
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                {DAILY_TILES.map((tile, i) => (
-                  <motion.button
-                    key={tile.id}
-                    custom={i}
-                    variants={cardVariants}
-                    initial="hidden"
-                    animate="visible"
-                    whileHover={{ scale: 1.03 }}
-                    whileTap={{ scale: 0.97 }}
-                    onClick={() => { playSound('click'); navigate(tile.path); }}
-                    className={`relative overflow-hidden text-left rounded-3xl p-6 shadow-2xl bg-gradient-to-br ${tile.gradient} group`}
-                  >
-                    <div className="absolute -top-6 -right-6 w-28 h-28 rounded-full bg-white/10 group-hover:scale-125 transition-transform duration-500" />
-                    <div className="text-5xl mb-4">{tile.emoji}</div>
-                    <h3 className="text-2xl font-extrabold mb-1">{tile.label}</h3>
-                    <p className="text-white/70 text-sm">{tile.description}</p>
-                  </motion.button>
-                ))}
+                {DAILY_TILES.map((tile, i) => {
+                  const locked = userProfile.isGuest && tile.id !== 'jokes'
+                  return (
+                    <motion.button
+                      key={tile.id}
+                      custom={i}
+                      variants={cardVariants}
+                      initial="hidden"
+                      animate="visible"
+                      whileHover={locked ? {} : { scale: 1.03 }}
+                      whileTap={locked ? {} : { scale: 0.97 }}
+                      onClick={() => {
+                        if (locked) {
+                          playSound('wrong')
+                          return
+                        }
+                        playSound('click');
+                        navigate(`${tile.path}?tab=${tile.id}`);
+                      }}
+                      className={`relative overflow-hidden text-left rounded-3xl p-6 shadow-2xl bg-gradient-to-br ${tile.gradient} group ${locked ? 'grayscale opacity-60 cursor-not-allowed' : ''}`}
+                    >
+                      {locked && (
+                        <div className="absolute inset-0 bg-black/20 flex items-center justify-center z-30">
+                          <div className="bg-black/60 backdrop-blur-md px-4 py-2 rounded-xl border border-white/20 flex items-center gap-2">
+                            <Lock size={16} className="text-white" />
+                            <span className="text-white font-black text-xs">LOCKED</span>
+                          </div>
+                        </div>
+                      )}
+                      {tile.isNew && !locked && (
+                        <div className="absolute top-4 right-4 bg-yellow-400 text-blue-900 text-[10px] font-black px-2 py-0.5 rounded-full z-20 animate-bounce">
+                          NEW
+                        </div>
+                      )}
+                      <div className="absolute -top-6 -right-6 w-28 h-28 rounded-full bg-white/10 group-hover:scale-125 transition-transform duration-500" />
+                      <div className="text-5xl mb-4">{tile.emoji}</div>
+                      <h3 className="text-2xl font-extrabold mb-1">{tile.label}</h3>
+                      <p className="text-white/70 text-sm">{tile.description}</p>
+                    </motion.button>
+                  )
+                })}
               </div>
             </motion.div>
           )}
@@ -496,7 +707,7 @@ export default function Dashboard() {
           {[
             { label: 'Total XP', value: xp.toLocaleString(), emoji: '⚡' },
             { label: 'Level', value: level, emoji: '🏆' },
-            { label: 'Quizzes', value: userProfile?.quizzesCompleted ?? 0, emoji: '📚' },
+            { label: 'Quizzes', value: userProfile.quizzesCompleted ?? 0, emoji: '📚' },
           ].map((s) => (
             <div key={s.label} className="glass card text-center py-4">
               <div className="text-2xl mb-1">{s.emoji}</div>

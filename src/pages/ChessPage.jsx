@@ -8,7 +8,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { getBestMove } from '../data/chessAI'
 import { ArrowLeft, Clock, Star } from 'lucide-react'
 
-const XP_BY_DIFFICULTY = { medium: 500, hard: 800 }
+const XP_BY_DIFFICULTY = { easy: 200, medium: 500, hard: 800 }
 const DRAW_XP = 100
 
 // Unicode piece glyphs — use filled (black) variants for both sides; color via CSS
@@ -55,13 +55,14 @@ function squareName(fileIdx, rankIdx) {
 }
 
 const DIFFICULTY_CARDS = [
-  { key: 'medium', label: 'Medium', emoji: '🧠', xp: 500, gradient: 'from-blue-600 to-violet-500', desc: 'AI uses basic strategy (depth 2)' },
-  { key: 'hard',   label: 'Hard',   emoji: '🔥', xp: 800, gradient: 'from-red-600 to-rose-500',   desc: 'AI plays smart (depth 3)' },
+  { key: 'easy',   label: 'Easy',   emoji: '🟢', xp: 200, gradient: 'from-green-600 to-emerald-500', desc: 'AI plays randomly — great for beginners' },
+  { key: 'medium', label: 'Medium', emoji: '🧠', xp: 500, gradient: 'from-blue-600 to-violet-500',   desc: 'AI uses basic strategy (depth 2)' },
+  { key: 'hard',   label: 'Hard',   emoji: '🔥', xp: 800, gradient: 'from-red-600 to-rose-500',     desc: 'AI plays smart (depth 3)' },
 ]
 
 export default function ChessPage() {
   const navigate = useNavigate()
-  const { currentUser, userProfile, setUserProfile } = useAuth()
+  const { currentUser, userProfile, setUserProfile, isGuest } = useAuth()
 
   const [phase, setPhase]         = useState('setup')  // 'setup'|'playing'|'done'
   const [difficulty, setDifficulty] = useState(null)
@@ -86,19 +87,24 @@ export default function ChessPage() {
   }, [phase])
 
   function startGame(diff) {
-    const c = new Chess()
-    setChess(c)
-    setBoard(c.board())
-    setDifficulty(diff)
-    setSelectedSq(null)
-    setLegalDests([])
-    setResult(null)
-    setSessionXP(0)
-    setXpSaved(false)
-    setElapsed(0)
-    setAiThinking(false)
-    setLastMove(null)
-    setPhase('playing')
+    try {
+      const c = new Chess()
+      setChess(c)
+      setBoard(c.board())
+      setDifficulty(diff)
+      setSelectedSq(null)
+      setLegalDests([])
+      setResult(null)
+      setSessionXP(0)
+      setXpSaved(false)
+      setElapsed(0)
+      setAiThinking(false)
+      setLastMove(null)
+      setPhase('playing')
+    } catch (e) {
+      console.error("Chess init failed:", e)
+      alert("Chess engine failed to load. Please try refreshing.")
+    }
   }
 
   const checkGameOver = useCallback(async (c, diff) => {
@@ -118,19 +124,21 @@ export default function ChessPage() {
     if (!xpSaved) {
       setXpSaved(true)
       try {
-        await updateDoc(doc(db, 'users', currentUser.uid), {
-          totalXP: increment(xp),
-          puzzlesCompleted: increment(1),
-        })
-        await addDoc(collection(db, 'puzzleHistory'), {
-          uid: currentUser.uid,
-          username: userProfile?.username,
-          type: 'chess',
-          difficulty: diff,
-          result: outcome,
-          xpEarned: xp,
-          timestamp: serverTimestamp(),
-        })
+        if (!isGuest) {
+          await updateDoc(doc(db, 'users', currentUser.uid), {
+            totalXP: increment(xp),
+            puzzlesCompleted: increment(1),
+          })
+          await addDoc(collection(db, 'puzzleHistory'), {
+            uid: currentUser.uid,
+            username: userProfile?.username,
+            type: 'chess',
+            difficulty: diff,
+            result: outcome,
+            xpEarned: xp,
+            timestamp: serverTimestamp(),
+          })
+        }
         setUserProfile((prev) => ({ ...prev, totalXP: (prev?.totalXP ?? 0) + xp, puzzlesCompleted: (prev?.puzzlesCompleted ?? 0) + 1 }))
       } catch (e) {
         console.error('Error saving Chess XP:', e)
@@ -219,7 +227,7 @@ export default function ChessPage() {
             <h1 className="text-4xl font-black mb-2">Chess</h1>
             <p className="text-gray-400">Play as White against the computer</p>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-md mx-auto">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-2xl mx-auto">
             {DIFFICULTY_CARDS.map((d) => (
               <motion.button
                 key={d.key}
@@ -264,7 +272,8 @@ export default function ChessPage() {
               <Clock size={13} /> {formatTime(elapsed)}
             </span>
             <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-              difficulty === 'medium' ? 'bg-blue-500/20 text-blue-400' : 'bg-red-500/20 text-red-400'
+              difficulty === 'easy'   ? 'bg-green-500/20 text-green-400' :
+              difficulty === 'medium' ? 'bg-blue-500/20 text-blue-400'   : 'bg-red-500/20 text-red-400'
             }`}>
               {difficulty}
             </span>
@@ -355,7 +364,7 @@ export default function ChessPage() {
                             ? 'bg-gradient-to-br from-amber-50 to-amber-200 ring-4 ring-amber-300'
                             : 'bg-gradient-to-br from-gray-800 to-black ring-4 ring-gray-700'
                           }`}
-                        style={{ fontSize: '3.2rem' }}
+                        style={{ fontSize: 'min(3.2rem, 9vw)' }}
                       >
                         <span 
                           className="drop-shadow-lg"

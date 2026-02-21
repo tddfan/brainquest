@@ -15,6 +15,9 @@ import ChessPage from './pages/ChessPage'
 import Millionaire from './pages/Millionaire'
 import DailyFun from './pages/DailyFun'
 import Shop from './pages/Shop'
+import MathsQuest from './pages/MathsQuest'
+import EnglishQuest from './pages/EnglishQuest'
+import MemoryGame from './pages/MemoryGame'
 
 export default function App() {
   return (
@@ -25,11 +28,11 @@ export default function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
 
-          {/* Protected routes */}
+          {/* Protected routes but some allow Guests */}
           <Route
             path="/"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowGuest={true}>
                 <Dashboard />
               </ProtectedRoute>
             }
@@ -37,7 +40,7 @@ export default function App() {
           <Route
             path="/quiz/:category"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowGuest={true}>
                 <QuizPage />
               </ProtectedRoute>
             }
@@ -95,7 +98,7 @@ export default function App() {
           <Route
             path="/puzzle/chess"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowGuest={true}>
                 <ChessPage />
               </ProtectedRoute>
             }
@@ -111,7 +114,7 @@ export default function App() {
           <Route
             path="/daily-fun"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowGuest={true}>
                 <DailyFun />
               </ProtectedRoute>
             }
@@ -121,6 +124,30 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <Shop />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/maths-quest"
+            element={
+              <ProtectedRoute>
+                <MathsQuest />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/english-quest"
+            element={
+              <ProtectedRoute>
+                <EnglishQuest />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/puzzle/memory"
+            element={
+              <ProtectedRoute>
+                <MemoryGame />
               </ProtectedRoute>
             }
           />
