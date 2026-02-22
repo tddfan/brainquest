@@ -11,14 +11,13 @@ import { useSound } from '../hooks/useSound'
 import { PREMIUM_AVATARS, MYSTERY_PETS, SHOP_THEMES } from '../data/shop'
 
 const SECTIONS = [
-  { id: 'fun',     label: 'Daily Fun', emoji: '✨' },
   { id: 'quizzes', label: 'Quizzes',  emoji: '🎯' },
   { id: 'puzzles', label: 'Puzzles',  emoji: '🧩' },
   { id: 'learn',   label: 'Learn',    emoji: '📚' },
+  { id: 'fun',     label: 'Daily Fun', emoji: '✨' },
 ]
 
 const PUZZLE_TILES = [
-  { id: 'obby', label: 'Parkour Obby', emoji: '🏃‍♂️', description: '50 checkpoints of parkour & quizzes', gradient: 'from-blue-600 to-cyan-500', xpNote: 'Coming Soon', path: '/puzzle/obby', isComingSoon: true },
   { id: 'millionaire', label: 'XP Millionaire', emoji: '💰', description: '15 questions to reach 1 Million XP', gradient: 'from-blue-700 to-indigo-600', xpNote: 'Up to 10,000 XP', path: '/puzzle/millionaire', isNew: true },
   { id: 'chess', label: 'Chess', emoji: '♟️', description: 'Beat the computer at chess', gradient: 'from-neutral-700 to-gray-600', xpNote: 'Up to 800 XP', path: '/puzzle/chess' },
   { id: 'sudoku', label: 'Sudoku', emoji: '🔢', description: 'Fill every row, column & box with 1–9', gradient: 'from-emerald-600 to-teal-500', xpNote: 'Up to 950 XP', path: '/puzzle/sudoku' },
@@ -26,6 +25,7 @@ const PUZZLE_TILES = [
   { id: 'wordle', label: 'Wordle', emoji: '🟩', description: 'Guess the 5-letter word in 6 tries', gradient: 'from-green-600 to-lime-500', xpNote: 'Up to 300 XP', path: '/puzzle/wordle' },
   { id: 'hangman', label: 'Hangman', emoji: '🪢', description: 'Guess letters before the man falls', gradient: 'from-orange-600 to-amber-500', xpNote: 'Up to 200 XP', path: '/puzzle/hangman' },
   { id: 'memory', label: 'Memory Game', emoji: '🃏', description: 'Flip cards and match the pairs', gradient: 'from-purple-600 to-pink-500', xpNote: 'Up to 400 XP', path: '/puzzle/memory', isNew: true },
+  { id: 'obby', label: 'Parkour Obby', emoji: '🏃‍♂️', description: '50 checkpoints of parkour & quizzes', gradient: 'from-blue-600 to-cyan-500', xpNote: 'Coming Soon', path: '/puzzle/obby', isComingSoon: true },
 ]
 
 const LEARN_TILES = [
@@ -51,7 +51,7 @@ export default function Dashboard() {
   const { playSound } = useSound()
   const [showAbout, setShowAbout] = useState(false)
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
-  const [section, setSection] = useState('fun')
+  const [section, setSection] = useState('quizzes')
   const [showDailyBonus, setShowDailyBonus] = useState(false)
   const [deferredPrompt, setDeferredPrompt] = useState(null)
   const [isIOS, setIsIOS] = useState(false)
@@ -81,7 +81,7 @@ export default function Dashboard() {
           hp: 10000,
           maxHp: 10000,
           level: 1,
-          active: true
+          active: false
         })
       }
     })
@@ -282,41 +282,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Global Boss Bar */}
-        {boss && boss.hp > 0 && (
-          <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="mb-4 relative group">
-            <div className="absolute -inset-0.5 bg-gradient-to-r from-red-600 to-orange-600 rounded-xl blur opacity-10 group-hover:opacity-30 transition duration-1000 animate-pulse" />
-            <div className="relative glass card p-2 px-3 border-red-500/30 bg-red-950/30 overflow-hidden">
-              <div className="flex items-center justify-between mb-1.5">
-                <div className="flex items-center gap-1.5">
-                  <Flame size={14} className="text-red-500 animate-pulse" fill="currentColor" />
-                  <span className="text-[9px] font-black uppercase tracking-[0.1em] text-red-400">World Boss: {boss.name || 'The Knowledge Monster'}</span>
-                  <div className="group/info relative cursor-help">
-                    <Info size={10} className="text-gray-500 hover:text-white transition-colors" />
-                    <div className="absolute left-0 top-5 w-48 p-2 bg-black/95 backdrop-blur-xl border border-white/10 rounded-xl text-[8px] text-gray-300 font-bold leading-relaxed opacity-0 group-hover/info:opacity-100 transition-opacity z-[60] pointer-events-none shadow-2xl">
-                      🔥 Answer questions correctly in <span className="text-yellow-400">Quests</span> or solve <span className="text-blue-400">Puzzles</span> to deal damage and defeat the boss together!
-                    </div>
-                  </div>
-                </div>
-                <span className="text-[9px] font-black text-white tabular-nums">{boss.hp.toLocaleString()} / {boss.maxHp.toLocaleString()} HP</span>
-              </div>
-              <div className="w-full bg-black/60 h-1.5 rounded-full overflow-hidden border border-white/5 p-0.5">
-                <motion.div 
-                  className="h-full rounded-full bg-gradient-to-r from-red-600 via-orange-500 to-red-600 bg-[length:200%_100%] shadow-[0_0_10px_rgba(239,68,68,0.4)]" 
-                  animate={{ width: `${(boss.hp / boss.maxHp) * 100}%` }} 
-                  transition={{ duration: 1.5, type: 'spring' }} 
-                />
-              </div>
-            </div>
-          </motion.div>
-        )}
-
-        {boss && boss.hp <= 0 && (
-          <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="mb-6 glass card p-4 border-green-500/30 bg-green-500/10 text-center">
-            <p className="text-xs font-black text-green-400 uppercase tracking-[0.2em]">🎉 Victory! The Boss has been defeated! 🎉</p>
-            <p className="text-[10px] text-gray-400 font-bold uppercase mt-1">New monster spawning soon...</p>
-          </motion.div>
-        )}
+        {/* World Boss Hidden */}
 
         <div className="grid grid-cols-3 gap-2 sm:gap-4 mb-6">
           <button onClick={claimQuestReward} disabled={userProfile.dailyQuizzesCount < 3 || userProfile.dailyQuestClaimed} className={`glass card p-3 flex flex-col items-center justify-center border-l-4 transition-all active:scale-95 ${userProfile.dailyQuestClaimed ? 'border-green-500 bg-green-500/5' : (userProfile.dailyQuizzesCount >= 3 ? 'border-yellow-500 bg-yellow-500/10 animate-pulse' : 'border-orange-500 bg-white/5')}`}>

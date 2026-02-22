@@ -213,13 +213,13 @@ export default function Shop() {
         <AnimatePresence mode="wait">
           {activeCat === 'inventory' && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} key="inventory" className="space-y-4">
-              {unlockedAvatars.filter(id => id.startsWith('pet_')).length === 0 ? (
+              {unlockedAvatars.filter(id => typeof id === 'string' && id.startsWith('pet_')).length === 0 ? (
                 <div className="text-center py-20 bg-white/5 rounded-3xl border-2 border-dashed border-white/5">
                   <p className="font-black text-gray-500 uppercase tracking-widest">No pets yet. Hatch some eggs!</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                  {Array.from(new Set(unlockedAvatars.filter(id => id.startsWith('pet_')))).map(petId => {
+                  {Array.from(new Set(unlockedAvatars.filter(id => typeof id === 'string' && id.startsWith('pet_')))).map(petId => {
                     const pet = MYSTERY_PETS.find(p => p.id === petId)
                     const count = unlockedAvatars.filter(id => id === petId).length
                     if (!pet) return null

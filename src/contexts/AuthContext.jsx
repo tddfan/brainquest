@@ -24,6 +24,17 @@ export function AuthProvider({ children }) {
   const [isGuest, setIsGuest] = useState(false)
   const [loading, setLoading] = useState(true)
 
+  async function getUserLocation() {
+    try {
+      const res = await fetch('https://ipapi.co/json/')
+      const data = await res.json()
+      return `${data.city}, ${data.country_name}`
+    } catch (e) {
+      console.error('Location fetch failed:', e)
+      return 'Unknown'
+    }
+  }
+
   const GUEST_PROFILE = {
     uid: 'guest',
     username: 'Guest Explorer',
@@ -55,6 +66,7 @@ export function AuthProvider({ children }) {
       username = email.split('@')[0]
     }
 
+    const loc = await getUserLocation()
     const { user } = await createUserWithEmailAndPassword(auth, email, password)
     localStorage.setItem(LOGIN_TIMESTAMP_KEY, Date.now().toString())
     
@@ -71,6 +83,7 @@ export function AuthProvider({ children }) {
       level: 1,
       currentStreak: 1,
       lastLoginDate: new Date(),
+      location: loc,
       title: 'Quest Newbie',
       quizzesCompleted: 0,
       puzzlesCompleted: 0,
@@ -101,6 +114,9 @@ export function AuthProvider({ children }) {
     const result = await signInWithEmailAndPassword(auth, email, password)
     localStorage.setItem(LOGIN_TIMESTAMP_KEY, Date.now().toString())
     
+    const loc = await getUserLocation()
+    await updateDoc(doc(db, 'users', result.user.uid), { lastLoginDate: new Date(), location: loc })
+
     const profileSnap = await getDoc(doc(db, 'users', result.user.uid))
     if (profileSnap.exists()) {
       setUserProfile(profileSnap.data())
