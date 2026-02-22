@@ -188,17 +188,34 @@ export default function MathsQuest() {
   useEffect(() => {
     if (phase !== 'ended') return
     const finalScore = scoreRef.current
-    const xpEarned = finalScore * currentConfig.xp
+    let xpEarned = finalScore * currentConfig.xp
+    
+    // XP Boost
+    const isXPBoostActive = (userProfile?.activeBoosts?.xp || 0) > Date.now()
+    if (isXPBoostActive) xpEarned *= 2
+
+    // Diamond logic: 1 diamond for score >= 15
+    let diamondsToEarn = finalScore >= 15 ? 1 : 0
+    const isDiamondBoostActive = (userProfile?.activeBoosts?.diamonds || 0) > Date.now()
+    if (isDiamondBoostActive) diamondsToEarn *= 2
+
     if (finalScore > bestScore) localStorage.setItem(bestKey, finalScore.toString())
-    if (xpEarned === 0) return
+    if (xpEarned === 0 && diamondsToEarn === 0) return
+
     if (currentUser) {
-      updateDoc(doc(db, 'users', currentUser.uid), { 
+      const updateData = { 
         totalXP: increment(xpEarned),
         dailyXP: increment(xpEarned),
         mathsCompleted: increment(1)
-      }).catch(() => {})
+      }
+      if (diamondsToEarn > 0) updateData.diamonds = increment(diamondsToEarn)
+      updateDoc(doc(db, 'users', currentUser.uid), updateData).catch(() => {})
     }
-    setUserProfile(prev => ({ ...prev, totalXP: (prev?.totalXP ?? 0) + xpEarned }))
+    setUserProfile(prev => ({ 
+      ...prev, 
+      totalXP: (prev?.totalXP ?? 0) + xpEarned,
+      diamonds: (prev?.diamonds ?? 0) + diamondsToEarn
+    }))
   }, [phase])
 
   function handleAnswer(opt) {

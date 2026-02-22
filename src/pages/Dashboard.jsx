@@ -3,21 +3,22 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { CATEGORIES, AVATARS, calcLevel, xpToNextLevel } from '../data/questions'
-import { Trophy, LogOut, Star, Info, X, Zap, Gift, Target, Award, ShoppingBag, Lock, Check, RotateCcw, Download, Share, Users, Swords, Flame, Bell } from 'lucide-react'
+import { Trophy, LogOut, Star, Info, X, Zap, Gift, Target, Award, ShoppingBag, Lock, Check, RotateCcw, Download, Share, Users, Swords, Flame, Bell, Timer } from 'lucide-react'
 import confetti from 'canvas-confetti'
 import { doc, updateDoc, increment, onSnapshot, setDoc, getDoc, query, collection, where } from 'firebase/firestore'
 import { db } from '../firebase/config'
 import { useSound } from '../hooks/useSound'
-import { PREMIUM_AVATARS, MYSTERY_PETS } from '../data/shop'
+import { PREMIUM_AVATARS, MYSTERY_PETS, SHOP_THEMES } from '../data/shop'
 
 const SECTIONS = [
-  { id: 'learn',   label: 'Learn',    emoji: '📚' },
   { id: 'fun',     label: 'Daily Fun', emoji: '✨' },
   { id: 'quizzes', label: 'Quizzes',  emoji: '🎯' },
   { id: 'puzzles', label: 'Puzzles',  emoji: '🧩' },
+  { id: 'learn',   label: 'Learn',    emoji: '📚' },
 ]
 
 const PUZZLE_TILES = [
+  { id: 'obby', label: 'Parkour Obby', emoji: '🏃‍♂️', description: '50 checkpoints of parkour & quizzes', gradient: 'from-blue-600 to-cyan-500', xpNote: 'Coming Soon', path: '/puzzle/obby', isComingSoon: true },
   { id: 'millionaire', label: 'XP Millionaire', emoji: '💰', description: '15 questions to reach 1 Million XP', gradient: 'from-blue-700 to-indigo-600', xpNote: 'Up to 10,000 XP', path: '/puzzle/millionaire', isNew: true },
   { id: 'chess', label: 'Chess', emoji: '♟️', description: 'Beat the computer at chess', gradient: 'from-neutral-700 to-gray-600', xpNote: 'Up to 800 XP', path: '/puzzle/chess' },
   { id: 'sudoku', label: 'Sudoku', emoji: '🔢', description: 'Fill every row, column & box with 1–9', gradient: 'from-emerald-600 to-teal-500', xpNote: 'Up to 950 XP', path: '/puzzle/sudoku' },
@@ -50,7 +51,7 @@ export default function Dashboard() {
   const { playSound } = useSound()
   const [showAbout, setShowAbout] = useState(false)
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
-  const [section, setSection] = useState('learn')
+  const [section, setSection] = useState('fun')
   const [showDailyBonus, setShowDailyBonus] = useState(false)
   const [deferredPrompt, setDeferredPrompt] = useState(null)
   const [isIOS, setIsIOS] = useState(false)
@@ -190,8 +191,10 @@ export default function Dashboard() {
        MYSTERY_PETS.find(p => p.id === userProfile?.avatarIndex)?.emoji ||
        AVATARS[0])
 
+  const currentTheme = SHOP_THEMES.find(t => t.id === userProfile?.themeId) || { color: 'from-gray-950 via-violet-950 to-gray-950', text: 'text-white' }
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-violet-950 to-gray-950 px-4 py-6 relative overflow-x-hidden">
+    <div className={`min-h-screen bg-gradient-to-br ${currentTheme.color} ${currentTheme.text || 'text-white'} px-4 py-6 relative overflow-x-hidden`}>
       <AnimatePresence>
         {showDailyBonus && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
@@ -281,30 +284,29 @@ export default function Dashboard() {
 
         {/* Global Boss Bar */}
         {boss && boss.hp > 0 && (
-          <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="mb-6 relative group">
-            <div className="absolute -inset-0.5 bg-gradient-to-r from-red-600 to-orange-600 rounded-2xl blur opacity-20 group-hover:opacity-40 transition duration-1000 animate-pulse" />
-            <div className="relative glass card p-4 border-red-500/40 bg-red-950/40 overflow-hidden">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <Flame size={18} className="text-red-500 animate-pulse" fill="currentColor" />
-                  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-red-400">World Boss: {boss.name || 'The Knowledge Monster'}</span>
+          <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="mb-4 relative group">
+            <div className="absolute -inset-0.5 bg-gradient-to-r from-red-600 to-orange-600 rounded-xl blur opacity-10 group-hover:opacity-30 transition duration-1000 animate-pulse" />
+            <div className="relative glass card p-2 px-3 border-red-500/30 bg-red-950/30 overflow-hidden">
+              <div className="flex items-center justify-between mb-1.5">
+                <div className="flex items-center gap-1.5">
+                  <Flame size={14} className="text-red-500 animate-pulse" fill="currentColor" />
+                  <span className="text-[9px] font-black uppercase tracking-[0.1em] text-red-400">World Boss: {boss.name || 'The Knowledge Monster'}</span>
                   <div className="group/info relative cursor-help">
-                    <Info size={12} className="text-gray-500 hover:text-white transition-colors" />
-                    <div className="absolute left-0 top-6 w-48 p-2 bg-black/90 backdrop-blur-xl border border-white/10 rounded-xl text-[9px] text-gray-300 font-bold leading-relaxed opacity-0 group-hover/info:opacity-100 transition-opacity z-[60] pointer-events-none shadow-2xl">
+                    <Info size={10} className="text-gray-500 hover:text-white transition-colors" />
+                    <div className="absolute left-0 top-5 w-48 p-2 bg-black/95 backdrop-blur-xl border border-white/10 rounded-xl text-[8px] text-gray-300 font-bold leading-relaxed opacity-0 group-hover/info:opacity-100 transition-opacity z-[60] pointer-events-none shadow-2xl">
                       🔥 Answer questions correctly in <span className="text-yellow-400">Quests</span> or solve <span className="text-blue-400">Puzzles</span> to deal damage and defeat the boss together!
                     </div>
                   </div>
                 </div>
-                <span className="text-[10px] font-black text-white tabular-nums">{boss.hp.toLocaleString()} / {boss.maxHp.toLocaleString()} HP</span>
+                <span className="text-[9px] font-black text-white tabular-nums">{boss.hp.toLocaleString()} / {boss.maxHp.toLocaleString()} HP</span>
               </div>
-              <div className="w-full bg-black/60 h-2.5 rounded-full overflow-hidden border border-white/5 p-0.5">
+              <div className="w-full bg-black/60 h-1.5 rounded-full overflow-hidden border border-white/5 p-0.5">
                 <motion.div 
-                  className="h-full rounded-full bg-gradient-to-r from-red-600 via-orange-500 to-red-600 bg-[length:200%_100%] shadow-[0_0_15px_rgba(239,68,68,0.4)]" 
+                  className="h-full rounded-full bg-gradient-to-r from-red-600 via-orange-500 to-red-600 bg-[length:200%_100%] shadow-[0_0_10px_rgba(239,68,68,0.4)]" 
                   animate={{ width: `${(boss.hp / boss.maxHp) * 100}%` }} 
                   transition={{ duration: 1.5, type: 'spring' }} 
                 />
               </div>
-              <p className="text-[8px] text-center font-black uppercase tracking-widest text-gray-500 mt-2 animate-pulse">Defeat the boss for massive XP rewards!</p>
             </div>
           </motion.div>
         )}
@@ -396,11 +398,27 @@ export default function Dashboard() {
 
 function DashboardTile({ tile, i, userProfile, navigate, playSound, category = false, fun = false }) {
   const locked = userProfile.isGuest && (category ? tile.id !== 'flags' : (fun ? tile.id !== 'jokes' : tile.id !== 'chess'))
+  const isComingSoon = tile.isComingSoon
   const path = category ? `/quiz/${tile.id}` : (fun ? `${tile.path}?tab=${tile.id}` : tile.path)
+  
   return (
-    <motion.button custom={i} variants={cardVariants} initial="hidden" animate="visible" whileHover={locked ? {} : { scale: 1.02, y: -4 }} whileTap={locked ? {} : { scale: 0.98 }} onClick={() => { if (locked) { playSound('wrong'); return }; playSound('click'); navigate(path); }} className={`relative overflow-hidden text-left rounded-[2rem] p-6 shadow-2xl bg-gradient-to-br ${tile.gradient || 'from-gray-800 to-gray-900'} group ${locked ? 'grayscale opacity-60 cursor-not-allowed' : ''}`}>
+    <motion.button 
+      custom={i} 
+      variants={cardVariants} 
+      initial="hidden" 
+      animate="visible" 
+      whileHover={(locked || isComingSoon) ? {} : { scale: 1.02, y: -4 }} 
+      whileTap={(locked || isComingSoon) ? {} : { scale: 0.98 }} 
+      onClick={() => { 
+        if (locked || isComingSoon) { playSound('wrong'); return }; 
+        playSound('click'); 
+        navigate(path); 
+      }} 
+      className={`relative overflow-hidden text-left rounded-[2rem] p-6 shadow-2xl bg-gradient-to-br ${tile.gradient || 'from-gray-800 to-gray-900'} group ${(locked || isComingSoon) ? 'grayscale opacity-60 cursor-not-allowed' : ''}`}
+    >
       {locked && <div className="absolute inset-0 bg-black/30 flex items-center justify-center z-30"><div className="bg-black/60 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/20 flex items-center gap-2 scale-75"><Lock size={16} className="text-white" /><span className="text-white font-black text-xs uppercase">Locked</span></div></div>}
-      {tile.isNew && !locked && <div className="absolute top-4 right-4 bg-yellow-400 text-black text-[10px] font-black px-3 py-1 rounded-full z-20 animate-bounce shadow-xl">NEW</div>}
+      {isComingSoon && <div className="absolute inset-0 bg-black/40 flex items-center justify-center z-30 backdrop-blur-[2px]"><div className="bg-yellow-500 text-black px-4 py-2 rounded-2xl border-2 border-black/20 flex items-center gap-2 rotate-[-5deg] shadow-2xl"><Timer size={16} className="animate-pulse" /><span className="font-black text-xs uppercase tracking-widest">Coming Soon</span></div></div>}
+      {tile.isNew && !locked && !isComingSoon && <div className="absolute top-4 right-4 bg-yellow-400 text-black text-[10px] font-black px-3 py-1 rounded-full z-20 animate-bounce shadow-xl">NEW</div>}
       <div className="text-5xl mb-4 transition-transform group-hover:scale-110 duration-500">{tile.emoji}</div>
       <h3 className="text-xl font-black mb-1 leading-tight">{tile.label}</h3>
       <p className="text-white/60 text-xs font-medium leading-relaxed">{tile.description}</p>

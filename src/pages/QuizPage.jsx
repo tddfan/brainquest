@@ -115,13 +115,17 @@ export default function QuizPage() {
     let xpGained = 0
     if (isCorrect) {
       xpGained += XP_CORRECT
-      if (elapsed <= 10) xpGained += XP_SPEED_BONUS
+      if (answerTime / 1000 <= 10) xpGained += XP_SPEED_BONUS
       const newStreak = streak + 1
       setStreak(newStreak)
       if (newStreak >= 3) xpGained += XP_STREAK_BONUS
     } else {
       setStreak(0)
     }
+
+    // Apply XP Boost
+    const isXPBoostActive = (userProfile?.activeBoosts?.xp || 0) > Date.now()
+    if (isXPBoostActive) xpGained *= 2
 
     setSessionXP((prev) => prev + xpGained)
     setResults((prev) => [...prev, { correct: isCorrect, xp: xpGained }])
@@ -132,16 +136,24 @@ export default function QuizPage() {
     const isLast = current === questions.length - 1
     if (isLast) {
       const totalCorrect = results.filter((r) => r.correct).length + (selected === questions[current].correct ? 1 : 0)
+      const isPerfect = totalCorrect === questions.length
       
+      let diamondsToEarn = isPerfect ? 1 : 0
+      const isDiamondBoostActive = (userProfile?.activeBoosts?.diamonds || 0) > Date.now()
+      if (isDiamondBoostActive) diamondsToEarn *= 2
+
       try {
         if (!isGuest) {
           // Persist to Firestore only if NOT a guest
-          await updateDoc(doc(db, 'users', currentUser.uid), {
+          const updateData = {
             totalXP: increment(sessionXP),
             dailyXP: increment(sessionXP),
             quizzesCompleted: increment(1),
             dailyQuizzesCount: increment(1),
-          })
+          }
+          if (diamondsToEarn > 0) updateData.diamonds = increment(diamondsToEarn)
+
+          await updateDoc(doc(db, 'users', currentUser.uid), updateData)
           await addDoc(collection(db, 'quizHistory'), {
             uid: currentUser.uid,
             username: userProfile?.username,
@@ -149,6 +161,7 @@ export default function QuizPage() {
             score: totalCorrect,
             total: questions.length,
             xpEarned: sessionXP,
+            diamondsEarned: diamondsToEarn,
             timestamp: serverTimestamp(),
           })
         }
@@ -157,6 +170,7 @@ export default function QuizPage() {
         setUserProfile((prev) => ({
           ...prev,
           totalXP: (prev?.totalXP ?? 0) + sessionXP,
+          diamonds: (prev?.diamonds ?? 0) + diamondsToEarn,
           quizzesCompleted: (prev?.quizzesCompleted ?? 0) + 1,
           dailyQuizzesCount: (prev?.dailyQuizzesCount ?? 0) + 1,
         }))
@@ -552,9 +566,17 @@ function ResultsScreen({ results, sessionXP, navigate, userProfile, onPlayAgain,
         <h2 className="text-3xl font-black mb-1">{pct >= 80 ? 'Brilliant!' : pct >= 50 ? 'Good Work!' : 'Keep Practising!'}</h2>
         <p className="text-gray-400 mb-6">{correct} / {total} correct &nbsp;·&nbsp; {pct}%</p>
 
-        <div className="glass rounded-2xl py-4 px-6 mb-6 flex items-center justify-center gap-3">
-          <Zap size={24} className="text-violet-400" fill="currentColor" />
-          <span className="text-3xl font-black text-violet-300">+{sessionXP} XP</span>
+        <div className="glass rounded-2xl py-4 px-6 mb-6 flex flex-col items-center justify-center gap-2">
+          <div className="flex items-center gap-3">
+            <Zap size={24} className="text-violet-400" fill="currentColor" />
+            <span className="text-3xl font-black text-violet-300">+{sessionXP} XP</span>
+          </div>
+          {correct === total && (
+            <div className="flex items-center gap-2 text-blue-400 font-black text-sm uppercase tracking-widest mt-1">
+               <div className="w-4 h-4 bg-blue-400 rotate-45 border border-white/20" />
+               <span>+{(userProfile?.activeBoosts?.diamonds || 0) > Date.now() ? 2 : 1} Diamonds</span>
+            </div>
+          )}
         </div>
 
         <div className="w-full bg-white/10 rounded-full h-3 mb-8 px-4">

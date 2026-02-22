@@ -6,50 +6,36 @@ import { AVATARS } from '../data/questions'
 import { Mail, Lock, User, AlertCircle, CheckCircle2 } from 'lucide-react'
 
 export default function Register() {
-  const [username, setUsername] = useState('')
-  const [email, setEmail] = useState('')
+  const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
   const [avatarIndex, setAvatarIndex] = useState(0)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const { register, continueAsGuest } = useAuth()
+  const { register } = useAuth()
   const navigate = useNavigate()
 
   async function handleSubmit(e) {
     e.preventDefault()
     setError('')
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters.')
-      return
-    }
-    if (username.trim().length < 2) {
-      setError('Username must be at least 2 characters.')
+    if (identifier.trim().length < 2) {
+      setError('Username or Email must be at least 2 characters.')
       return
     }
     setLoading(true)
     try {
-      await register(email, password, username.trim(), avatarIndex)
+      await register(identifier.trim(), password, avatarIndex)
       navigate('/')
     } catch (err) {
       console.error('Registration error:', err.code, err.message)
       if (err.code === 'auth/email-already-in-use') {
-        setError('That email is already registered. Try logging in.')
-      } else if (err.code === 'auth/operation-not-allowed') {
-        setError('Email/Password sign-in is not enabled. Enable it in Firebase Console → Authentication → Sign-in method.')
-      } else if (err.code === 'auth/invalid-api-key' || err.code === 'auth/configuration-not-found') {
-        setError('Firebase config error. Check your .env file values.')
-      } else if (err.code === 'auth/network-request-failed') {
-        setError('Network error. Check your internet connection.')
+        setError('That email/username is already registered. Try logging in.')
+      } else if (err.message === 'Username already taken') {
+        setError('That username is already taken. Choose another one.')
       } else {
         setError(`Error: ${err.code ?? err.message}`)
       }
     }
     setLoading(false)
-  }
-
-  const handleGuest = () => {
-    continueAsGuest()
-    navigate('/')
   }
 
   return (
@@ -75,8 +61,8 @@ export default function Register() {
         )}
 
         {/* Avatar picker */}
-        <div className="mb-6">
-          <p className="text-sm font-bold text-gray-400 mb-3">Choose your avatar</p>
+        <div className="mb-6 px-8">
+          <p className="text-sm font-bold text-gray-400 mb-3 text-center">Choose your avatar</p>
           <div className="grid grid-cols-6 gap-2">
             {AVATARS.map((av, i) => (
               <button
@@ -92,32 +78,17 @@ export default function Register() {
           <div className="text-center mt-2 text-3xl">{AVATARS[avatarIndex]}</div>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4 px-8">
           <div>
-            <label className="text-sm font-bold text-gray-400 mb-1.5 block">Username</label>
+            <label className="text-sm font-bold text-gray-400 mb-1.5 block">Email or Username</label>
             <div className="relative">
               <User size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
                 type="text"
                 required
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="CoolExplorer42"
-                className="w-full bg-white/5 border border-white/10 rounded-2xl pl-10 pr-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-violet-500 transition-colors"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="text-sm font-bold text-gray-400 mb-1.5 block">Email</label>
-            <div className="relative">
-              <Mail size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
+                value={identifier}
+                onChange={(e) => setIdentifier(e.target.value)}
+                placeholder="CoolExplorer42 or you@example.com"
                 className="w-full bg-white/5 border border-white/10 rounded-2xl pl-10 pr-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-violet-500 transition-colors"
               />
             </div>
@@ -132,16 +103,10 @@ export default function Register() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
+                placeholder="Your secret code"
                 className="w-full bg-white/5 border border-white/10 rounded-2xl pl-10 pr-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-violet-500 transition-colors"
               />
             </div>
-            {password.length > 0 && (
-              <div className={`flex items-center gap-1.5 mt-1.5 text-xs font-semibold ${password.length >= 6 ? 'text-green-400' : 'text-red-400'}`}>
-                <CheckCircle2 size={12} />
-                {password.length >= 6 ? 'Strong enough!' : 'At least 6 characters needed'}
-              </div>
-            )}
           </div>
 
           <button
@@ -150,19 +115,6 @@ export default function Register() {
             className="btn-primary w-full text-center py-4 text-lg mt-2"
           >
             {loading ? '⏳ Creating account…' : 'Start Exploring! 🚀'}
-          </button>
-
-          <div className="relative my-6">
-            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/10"></div></div>
-            <div className="relative flex justify-center text-xs uppercase"><span className="bg-[#1a1635] px-2 text-gray-500 font-bold">Or</span></div>
-          </div>
-
-          <button
-            type="button"
-            onClick={handleGuest}
-            className="w-full bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold py-4 rounded-2xl transition-all"
-          >
-            Continue as Guest
           </button>
         </form>
 

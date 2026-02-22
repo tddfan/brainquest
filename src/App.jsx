@@ -22,6 +22,8 @@ import MistakesRoom from './pages/MistakesRoom'
 import MathsQuest from './pages/MathsQuest'
 import EnglishQuest from './pages/EnglishQuest'
 import MemoryGame from './pages/MemoryGame'
+import ObbyQuest from './pages/ObbyQuest'
+import AdminDashboard from './pages/AdminDashboard'
 
 export default function App() {
   return (
@@ -31,6 +33,7 @@ export default function App() {
           {/* Public routes */}
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/admin" element={<AdminDashboard />} />
 
           {/* Protected routes but some allow Guests */}
           <Route
@@ -38,6 +41,14 @@ export default function App() {
             element={
               <ProtectedRoute allowGuest={true}>
                 <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/puzzle/obby"
+            element={
+              <ProtectedRoute allowGuest={true}>
+                <ObbyQuest />
               </ProtectedRoute>
             }
           />

@@ -88,12 +88,32 @@ export default function EnglishQuest() {
 
   function handleNext() {
     if (idx + 1 >= questions.length) {
-      const earned = score * XP_PER_Q
-      if (earned > 0) {
+      let earned = score * XP_PER_Q
+      
+      // XP Boost
+      const isXPBoostActive = (userProfile?.activeBoosts?.xp || 0) > Date.now()
+      if (isXPBoostActive) earned *= 2
+
+      // Diamond Logic: 1 diamond for score >= 10 (perfect)
+      let diamondsToEarn = score >= 10 ? 1 : 0
+      const isDiamondBoostActive = (userProfile?.activeBoosts?.diamonds || 0) > Date.now()
+      if (isDiamondBoostActive) diamondsToEarn *= 2
+
+      if (earned > 0 || diamondsToEarn > 0) {
         if (currentUser) {
-          updateDoc(doc(db, 'users', currentUser.uid), { totalXP: increment(earned), dailyXP: increment(earned), englishCompleted: increment(1) }).catch(() => {})
+          const updateData = { 
+            totalXP: increment(earned), 
+            dailyXP: increment(earned), 
+            englishCompleted: increment(1) 
+          }
+          if (diamondsToEarn > 0) updateData.diamonds = increment(diamondsToEarn)
+          updateDoc(doc(db, 'users', currentUser.uid), updateData).catch(() => {})
         }
-        setUserProfile(prev => ({ ...prev, totalXP: (prev?.totalXP ?? 0) + earned }))
+        setUserProfile(prev => ({ 
+          ...prev, 
+          totalXP: (prev?.totalXP ?? 0) + earned,
+          diamonds: (prev?.diamonds ?? 0) + diamondsToEarn
+        }))
       }
       setPhase('ended')
     } else {

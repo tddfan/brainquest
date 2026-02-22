@@ -30,6 +30,8 @@ export function AuthProvider({ children }) {
     avatarIndex: 0,
     unlockedAvatars: [0],
     totalXP: 0,
+    diamonds: 0,
+    activeBoosts: { xp: 0, diamonds: 0 },
     level: 1,
     currentStreak: 0,
     lastLoginDate: null,
@@ -39,12 +41,22 @@ export function AuthProvider({ children }) {
     isGuest: true
   }
 
-  async function register(email, password, username, avatarIndex) {
+  async function register(identifier, password, avatarIndex) {
+    let email = identifier.trim()
+    let username = identifier.trim()
+
+    if (!email.includes('@')) {
+      // If it's a username, check if it's already taken in Firestore
+      const snap = await getDocs(query(collection(db, 'users'), where('username', '==', username)))
+      if (!snap.empty) throw new Error('Username already taken')
+      email = `${username.toLowerCase()}@brainquest.app`
+    } else {
+      // If it's an email, extract username or use email as username if needed
+      username = email.split('@')[0]
+    }
+
     const { user } = await createUserWithEmailAndPassword(auth, email, password)
     localStorage.setItem(LOGIN_TIMESTAMP_KEY, Date.now().toString())
-    
-    // Carry over guest XP if they have any
-    const carryOverXP = isGuest ? (userProfile?.totalXP ?? 0) : 0
     
     const profile = {
       uid: user.uid,
@@ -53,45 +65,48 @@ export function AuthProvider({ children }) {
       username_low: username.toLowerCase(),
       avatarIndex,
       unlockedAvatars: [avatarIndex],
-      totalXP: carryOverXP,
+      totalXP: 0,
+      diamonds: 0,
+      activeBoosts: { xp: 0, diamonds: 0 },
       level: 1,
       currentStreak: 1,
       lastLoginDate: new Date(),
       title: 'Quest Newbie',
-      quizzesCompleted: isGuest ? (userProfile?.quizzesCompleted ?? 0) : 0,
-      puzzlesCompleted: isGuest ? (userProfile?.puzzlesCompleted ?? 0) : 0,
-      dailyQuizzesCount: isGuest ? (userProfile?.dailyQuizzesCount ?? 0) : 0,
+      quizzesCompleted: 0,
+      puzzlesCompleted: 0,
+      dailyQuizzesCount: 0,
       lastDailyUpdate: new Date(),
       createdAt: serverTimestamp(),
     }
     await setDoc(doc(db, 'users', user.uid), profile)
     
-    localStorage.removeItem(GUEST_STORAGE_KEY)
     setIsGuest(false)
     setCurrentUser(user)
     setUserProfile(profile)
     return user
   }
 
-  async function login(emailOrUsername, password) {
-    let email = emailOrUsername.trim()
+  async function login(identifier, password) {
+    let email = identifier.trim()
     if (!email.includes('@')) {
-      const snap = await getDocs(query(collection(db, 'users'), where('username', '==', email)))
-      if (snap.empty) throw new Error('No account found with that username')
-      email = snap.docs[0].data().email
+      // If it's a username, check if it exists in Firestore first to get the correct email mapping
+      const snap = await getDocs(query(collection(db, 'users'), where('username', '==', identifier.trim())))
+      if (snap.empty) {
+        // Try the default dummy email format if not found explicitly by username
+        email = `${identifier.trim().toLowerCase()}@brainquest.app`
+      } else {
+        email = snap.docs[0].data().email
+      }
     }
     const result = await signInWithEmailAndPassword(auth, email, password)
     localStorage.setItem(LOGIN_TIMESTAMP_KEY, Date.now().toString())
-    localStorage.removeItem(GUEST_STORAGE_KEY)
     
     const profileSnap = await getDoc(doc(db, 'users', result.user.uid))
     if (profileSnap.exists()) {
-      const data = profileSnap.data();
-      setUserProfile(data)
+      setUserProfile(profileSnap.data())
       setIsGuest(false)
       setCurrentUser(result.user)
     }
-    
     return result
   }
 
@@ -169,6 +184,12 @@ export function AuthProvider({ children }) {
             } else {
               await updateDoc(doc(db, 'users', user.uid), { currentStreak: 1, lastLoginDate: today })
               data.currentStreak = 1
+            }
+
+            // Special Reward for AaravTheCreator
+            if (data.username === 'AaravTheCreator' && !data.unlockedAvatars?.includes('pet_dolphin')) {
+              await updateDoc(doc(db, 'users', user.uid), { unlockedAvatars: [...(data.unlockedAvatars || []), 'pet_dolphin'] })
+              data.unlockedAvatars = [...(data.unlockedAvatars || []), 'pet_dolphin']
             }
 
             setUserProfile(data)
