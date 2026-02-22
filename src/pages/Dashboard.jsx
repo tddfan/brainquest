@@ -19,7 +19,7 @@ const SECTIONS = [
 
 const PUZZLE_TILES = [
   { id: 'millionaire', label: 'XP Millionaire', emoji: '💰', description: '15 questions to reach 1 Million XP', gradient: 'from-blue-700 to-indigo-600', xpNote: 'Up to 10,000 XP', path: '/puzzle/millionaire', isNew: true },
-  { id: 'chess', label: 'Chess', emoji: '♟️', description: 'Beat the computer at chess', gradient: 'from-neutral-700 to-gray-600', xpNote: 'Up to 800 XP', path: '/puzzle/chess' },
+  { id: 'chess', label: 'Grandmaster Chess', emoji: '⚔️', description: 'Defeat the AI in an epic match', gradient: 'from-amber-700 to-orange-900', xpNote: 'Up to 800 XP', path: '/puzzle/chess' },
   { id: 'sudoku', label: 'Sudoku', emoji: '🔢', description: 'Fill every row, column & box with 1–9', gradient: 'from-emerald-600 to-teal-500', xpNote: 'Up to 950 XP', path: '/puzzle/sudoku' },
   { id: 'crossword', label: 'Mini Crossword', emoji: '📝', description: 'Solve a 7×7 crossword puzzle', gradient: 'from-rose-600 to-pink-500', xpNote: 'Up to 350 XP', path: '/puzzle/crossword' },
   { id: 'wordle', label: 'Wordle', emoji: '🟩', description: 'Guess the 5-letter word in 6 tries', gradient: 'from-green-600 to-lime-500', xpNote: 'Up to 300 XP', path: '/puzzle/wordle' },
